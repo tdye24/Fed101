@@ -1,22 +1,34 @@
 import os
-from models.utils.model_utils import read_data
+from models.utils.args import parse_args
+
 from models.server import Server
-from models.client import Client
-
-
-# setup clients
-def setup_clients(dataset, model=None):
-    train_data_dir = os.path.join('..', 'data', dataset, 'data', 'train')
-    test_data_dir = os.path.join('..', 'data', dataset, 'data', 'test')
-
-    users, train_data, test_data = read_data(train_data_dir, test_data_dir)
-    clients_ = [Client(user_id, train_data[user_id], test_data[user_id], model, mini_batch=0.1) for user_id in users]
-    return clients_
 
 
 if __name__ == '__main__':
-    clients = setup_clients('femnist', model='cnn')
-    server = Server(clients, rounds=5000, epoch=1, clients_per_round=20, eval_interval=20, model_path='./femnist/femnist.pkl')
+    args = parse_args()
+    dataset = args.dataset
+    model_name = args.model
+    model_path = args.model_path
+    epoch = args.epoch
+    num_rounds = args.num_rounds
+    eval_interval = args.eval_interval
+    clients_per_round = args.clients_per_round
+    batch_size = args.batch_size
+    mini_batch = args.mini_batch
+    seed = args.seed
+    lr = args.lr
+
+    server = Server(rounds=num_rounds,
+                    epoch=epoch,
+                    clients_per_round=clients_per_round,
+                    eval_interval=eval_interval,
+                    model_path=model_path,
+                    seed=seed,
+                    dataset_name=dataset,
+                    model_name=model_name,
+                    lr=lr,
+                    batch_size=batch_size,
+                    mini_batch=mini_batch)
     server.federate()
-    server.clients_accuracies()
+    server.print_optim()
     server.client_info(user_index=0)
