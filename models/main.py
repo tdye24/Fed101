@@ -16,5 +16,7 @@ def setup_clients(dataset, model=None):
 
 if __name__ == '__main__':
     clients = setup_clients('femnist', model='cnn')
-    server = Server(clients, rounds=3000, clients_per_round=3)
+    server = Server(clients, rounds=5000, epoch=1, clients_per_round=20, eval_interval=20, model_path='./femnist/femnist.pkl')
     server.federate()
+    server.clients_accuracies()
+    server.client_info(user_index=0)
