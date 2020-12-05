@@ -6,6 +6,8 @@ cd Fed101 &
 python main.py
 -dataset
 mnist
+-partitioning
+iid
 -model
 mnist2nn
 -model-path
