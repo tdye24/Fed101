@@ -1,38 +1,19 @@
 # Fed101
 # Fed101@XLab.DaSE.ECNU
 
-## Experiments
-
-| dataset       | accuracy | link |
-| ------------- | -------- | ---- |
-| FEMNIST       | 83.21%   |      |
-| CIFAR10       | 83.00%   |      |
-| synthetic_iid | 93.66%   |      |
-|               |          |      |
-
-- C: clients per communitions round
-- E: epoch
-- B: batch size
-- T: threshold
-- R: communication rounds
-
 ### MNIST
 
-Fed 0
+- overview: 60000 training examples and 10000 test examples.
 
-IID
+#### IID
 
-Batch-size: 10
+- partitioning: Data is shuffled  and then partitioned into 100 clients each receiving 600 examples.
 
-Epoch: 1
+|  Model   | Clients Per Round | Epoch | Batchsize | Threshold/Rounds | Optimal/Rounds |
+| :------: | :---------------: | :---: | :-------: | :--------------: | :------------: |
+| MNIST2NN |   10/ 100 (0.1)   |   1   |    10     |     97%/144      |   98.09%/630   |
+|          |                   |       |           |                  |                |
+|          |                   |       |           |                  |                |
 
-Clients Per Round: 10/100 (0.1)
-
-实验结果：
-
-| C             | E    | B    | T    | R    |
-| ------------- | ---- | ---- | ---- | ---- |
-| 10/ 100 (0.1) | 1    | 10   | 97%  |      |
-|               |      |      |      |      |
-|               |      |      |      |      |
+#### Non-IID
 
