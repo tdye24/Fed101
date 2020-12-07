@@ -1,4 +1,7 @@
+import gc
 import os
+import sys
+import torch.multiprocessing as mp
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,8 +10,8 @@ from models.utils.model_utils import read_data
 # noinspection PyUnresolvedReferences
 from tensorboardX import SummaryWriter
 from models.client import Client
-plt.switch_backend('agg')
 
+plt.switch_backend('agg')
 
 i_ = 0
 while os.path.exists('../visualization/fed' + str(i_)):
@@ -17,9 +20,12 @@ writer = SummaryWriter('../visualization/fed' + str(i_))
 
 
 class Server:
-    def __init__(self, model_path, seed=123, rounds=20, epoch=1, clients_per_round=1, eval_interval=1, dataset_name='femnist', model_name='cnn', lr=3e-4, batch_size=1, mini_batch=0.1):
+    def __init__(self, model_path, partitioning='iid', seed=123, rounds=20, epoch=1, clients_per_round=1, eval_interval=1,
+                 dataset_name='femnist', model_name='cnn', lr=3e-4, batch_size=1, mini_batch=0.1):
         self.seed = seed  # randomly sampling
-        self.clients = self.setup_clients(dataset_name, model_name=model_name, lr=lr, batch_size=batch_size, mini_batch=mini_batch)
+        self.partitioning = partitioning
+        self.clients = self.setup_clients(dataset_name, model_name=model_name, lr=lr, batch_size=batch_size,
+                                          mini_batch=mini_batch)
         self.model_path = model_path
         self.rounds = rounds
         self.epoch = epoch
@@ -36,13 +42,11 @@ class Server:
         self.selected_clients = []
         self.optim = {'round': 0, 'acc': 0.0, 'params': None}  # 第几轮，准确率，最高准确率对应的参数
 
-    # setup clients
-    @staticmethod
-    def setup_clients(dataset_name, model_name: str, batch_size: int, mini_batch: float, lr: float):
+    def setup_clients(self, dataset_name, model_name: str, batch_size: int, mini_batch: float, lr: float):
         train_data_dir = os.path.join('..', 'data', dataset_name, 'data', 'train')
         test_data_dir = os.path.join('..', 'data', dataset_name, 'data', 'test')
 
-        users, train_data, test_data = read_data(train_data_dir, test_data_dir)
+        users, train_data, test_data = read_data(train_data_dir, test_data_dir, self.partitioning)
         clients = [
             Client(user_id, train_data[user_id], test_data[user_id], model_name=model_name, batch_size=batch_size,
                    mini_batch=mini_batch, lr=lr) for user_id in users]
@@ -83,6 +87,7 @@ class Server:
 
     def federate(self):
         print("Begin Federating!")
+        print(f"Training {len(self.clients)} clients!")
         for i in range(self.rounds):
             # 该条语句不能往后放，因为接下来要测试模型在选中的clients上的性能
             self.select_clients(round_th=i)
@@ -126,9 +131,11 @@ class Server:
             self.average()
 
             # 清空本轮状态
-            self.updates = []
-            self.acc_over_all = []
-            self.acc_over_sub = []
+            self.updates.clear()
+            self.acc_over_all.clear()
+            self.acc_over_sub.clear()
+            # 其实也不用清空，查看是否是这条语句导致内存一直上涨
+            self.selected_clients = None
 
     def test(self, domain: str):
         """
@@ -137,9 +144,16 @@ class Server:
         :return: 准确率列表，格式[（num_samples, acc）,...]
         """
         if domain == "all":
+            processes = []
             for c in self.clients:
+                # p = mp.spawn(fn=c.test, nprocs=1, join=True, daemon=False)
+                # p.start()
+                # processes.append(p)
                 num_test_samples, acc = c.test()
                 self.acc_over_all.append((num_test_samples, acc))
+                torch.cuda.empty_cache()
+            # for p in processes:
+            #     p.join()
             res_list = self.acc_over_all
             self.acc_over_all = []
             print("Average accuracy of all the clients: {}".format(self.avg_metric(res_list)))
@@ -148,6 +162,7 @@ class Server:
                 num_test_samples, acc = c.test()
                 c.acc_list.append(acc)  # client维护自己训练过程中的accuracy list
                 self.acc_over_sub.append((num_test_samples, acc))
+                torch.cuda.empty_cache()
             res_list = self.acc_over_sub
             self.acc_over_sub = []
             print("\t\tAverage accuracy of the selected clients: {}".format(self.avg_metric(res_list)))
@@ -158,9 +173,9 @@ class Server:
             c.set_params(self.params)  # 下发最终的模型
         print("Round {}".format(self.rounds), end=' ')
         acc_all = self.test(domain="all")
-        acc_sub = self.test(domain="sub")
+        # acc_sub = self.test(domain="sub")
         avg_acc_all = self.avg_metric(acc_all)
-        avg_acc_sub = self.avg_metric(acc_sub)
+        # avg_acc_sub = self.avg_metric(acc_sub)
 
         if avg_acc_all > self.optim['acc']:
             print("***当前最优模型***SAVE***")
@@ -176,4 +191,10 @@ class Server:
             writer.add_scalar('client {} acc'.format(user_index), self.clients[user_index].acc_list[i], global_step=i)
 
     def save_model(self):
+        path = ''
+        if not os.path.exists(self.model_path):
+            for s in self.model_path.split('/')[:-1]:
+                path = path + s + '/'
+            path = path[:-1]
+            os.makedirs(path)
         torch.save(self.params, self.model_path)
