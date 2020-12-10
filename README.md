@@ -28,13 +28,14 @@ mnist2nn
 1
 ```
 
-### MNIST
+### MNIS                     T
 
 - overview: 60000 training examples and 10000 test examples.
 
-- | label | 0    | 1    | 2    | 3    | 4    | 5    | 6    | 7    | 8    | 9    |
-  | :---: | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
-  |  num  | 5923 | 6742 | 5958 | 6131 | 5842 | 5421 | 5918 | 6265 | 5851 | 5949 |
+  - |      label       |  0   |  1   |  2   |  3   |  4   |  5   |  6   |  7   |  8   |  9   |
+    | :--------------: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
+    | training samples | 5923 | 6742 | 5958 | 6131 | 5842 | 5421 | 5918 | 6265 | 5851 | 5949 |
+    |   test samples   | 980  | 1135 | 1032 | 1010 | 982  | 892  | 958  | 1028 | 974  | 1009 |
 
 #### IID
 
@@ -50,3 +51,13 @@ Note that # means that it does not fully converge until the predefined communiti
 
 #### Non-IID
 
+|  Model   | Parameters | Clients Per Round | Epoch | Batchsize | Threshold\|Rounds | Optimal\|Rounds |
+| :------: | :--------: | :---------------: | :---: | :-------: | :---------------: | :-------------: |
+| MNIST2NN |   199210   |   10/ 100 (0.1)   |   1   |    10     |         N         |  *90.70%\|1009  |
+| MNIST2NN |   199210   |   10/ 100 (0.1)   |   1   | $\infty$  |         N         |  #51.72%\|2914  |
+| MNIST2NN |   199210   |   100/ 100(1.0)   |   1   | $\infty$  |         N         |  #49.99%\|2993  |
+| MNISTCNN |   582026   |   10/ 100 (0.1)   |   5   |    10     |         N         |  98.05%\|1074   |
+| MNISTCNN |   582026   |   100/ 100(1.0)   |   5   |    10     |         N         |  *96.90%\|817   |
+| MNISTCNN |   582026   |   100/ 100(1.0)   |   5   | $\infty$  |                   |                 |
+
+Note that * means that it does not converge and oscillates quite a bit.
