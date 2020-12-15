@@ -29,7 +29,7 @@ mnist2nn
 1
 ```
 
-### MNIS                     T
+### MNIST
 
 - overview: 60000 training examples and 10000 test examples.
 
