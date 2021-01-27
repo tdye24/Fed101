@@ -1,4 +1,5 @@
 # Fed101
+# Federated Learning(联邦学习)
 # Fed101@XLab.DaSE.ECNU
 
 ```sh
@@ -28,7 +29,7 @@ mnist2nn
 1
 ```
 
-### MNIS                     T
+### MNIST
 
 - overview: 60000 training examples and 10000 test examples.
 
