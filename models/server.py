@@ -79,14 +79,14 @@ class Server:
         # 画训练和测试时的acc和loss，设置两个writer，主要是想让两个曲线（训练和验证）放在一起
         if mini_batch == -1:
             self.train_writer = SummaryWriter(
-                f'../visualization/{self.algorithm}-{dataset_name}-{partitioning}-{model_name}-C{clients_per_round}-E{epoch}-B{flag}-train')
+                f'../visualization/{self.algorithm}-{dataset_name}-{partitioning}-{model_name}-C{clients_per_round}-E{epoch}-B{flag}-train-{self.lr}')
             self.test_writer = SummaryWriter(
-                f'../visualization/{self.algorithm}-{dataset_name}-{partitioning}-{model_name}-C{clients_per_round}-E{epoch}-B{flag}-val')
+                f'../visualization/{self.algorithm}-{dataset_name}-{partitioning}-{model_name}-C{clients_per_round}-E{epoch}-B{flag}-val-{self.lr}')
         else:
             self.train_writer = SummaryWriter(
-                f'../visualization/{self.algorithm}-{dataset_name}-{partitioning}-{model_name}-C{clients_per_round}-E{epoch}-M{mini_batch}-train')
+                f'../visualization/{self.algorithm}-{dataset_name}-{partitioning}-{model_name}-C{clients_per_round}-E{epoch}-M{mini_batch}-train-{self.lr}')
             self.test_writer = SummaryWriter(
-                f'../visualization/{self.algorithm}-{dataset_name}-{partitioning}-{model_name}-C{clients_per_round}-E{epoch}-M{mini_batch}-val')
+                f'../visualization/{self.algorithm}-{dataset_name}-{partitioning}-{model_name}-C{clients_per_round}-E{epoch}-M{mini_batch}-val-{self.lr}')
 
     def load_pretrain(self):
         print(f"loading pre-trained model from {self.pretrain_model}")
