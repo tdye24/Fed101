@@ -13,6 +13,7 @@ from models.cifar100.cifar100 import CIFAR100
 from models.synthetic_iid.fcnn import FCNN
 from models.mnist.MNIST2NN import MNIST2NN
 from models.mnist.MNISTCNN import MNISTCNN
+from models.ml100k.ML100K import ML100K
 
 from models.utils.model_utils import batch_data, compare_models
 import inspect
@@ -49,7 +50,7 @@ class Client:
         self.acc_list = []
         # fedprox用
         self.start_point = None
-        self.samples_num = len(trainloader.dataset._ids)
+        self.samples_num = len(trainloader.dataset._labels)
 
     def select_model(self, model_name):
         model = None
@@ -67,6 +68,8 @@ class Client:
             model = MNISTCNN()
         elif model_name == 'mobile_net':
             model = mobilenet(alpha=1, class_num=10)
+        elif model_name == 'ml100k':
+            model = ML100K()
         else:
             print("Unimplemented Model!")
             exit(0)
