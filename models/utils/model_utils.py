@@ -1,7 +1,22 @@
 import json
 import numpy as np
+import sys
 import os
+import torch
 from collections import defaultdict
+
+
+class Logger(object):
+    def __init__(self, filename="log.txt"):
+        self.terminal = sys.stdout
+        self.log = open(filename, "a")
+
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)
+
+    def flush(self):
+        pass
 
 
 def batch_data(data, batch_size, seed):
@@ -39,27 +54,25 @@ def read_dir(data_dir):
         clients.extend(cdata['users'])
         data.update(cdata['user_data'])
 
-    clients = list(sorted(data.keys()))
+    # clients = list(sorted(data.keys()))
     return clients, data
 
 
 def read_data(train_data_dir, test_data_dir):
-    '''parses data in given train and test data directories
-
+    """parses data in given train and test data directories
     assumes:
     - the data in the input directories are .json files with
         keys 'users' and 'user_data'
     - the set of train set users is the same as the set of test set users
-
     Return:
         clients: list of client ids
         groups: list of group ids; empty list if none found
         train_data: dictionary of train data
         test_data: dictionary of test data
-    '''
+    """
     train_clients, train_data = read_dir(train_data_dir)
     test_clients, test_data = read_dir(test_data_dir)
-
-    assert train_clients == test_clients
+    # 可能clients读入的顺序不一样
+    assert train_clients.sort() == test_clients.sort()
 
     return train_clients, train_data, test_data
