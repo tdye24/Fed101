@@ -15,6 +15,9 @@ from models.client import Client
 from data.CONSTANTS import *
 from data.cifar10.CIFAR10_DATASET import get_cifar10_dataloaders
 from data.mnist.MNIST_DATASET import get_mnist_dataloaders, get_mnist_dataloaders_niid
+from data.ml100k.ML100K_DATASET import get_ml100k_dataloaders
+from data.mnistprox.MNIST_PROX_DATASET import get_mnist_prox_dataloaders
+from data.femnistfedml.FEMNIST_FEDML_DATASET import get_femnist_fedml_dataloaders
 
 plt.switch_backend('agg')
 
@@ -71,7 +74,7 @@ class Server:
         epoch = self.epoch
 
         # 绘图初始化
-        if batch_size >= len(self.clients[0].trainloader.dataset._ids):  # 全部数据作为一个batch
+        if batch_size >= len(self.clients[0].trainloader.dataset._labels):  # 全部数据作为一个batch
             flag = "NAN"
         else:
             flag = batch_size
@@ -79,14 +82,14 @@ class Server:
         # 画训练和测试时的acc和loss，设置两个writer，主要是想让两个曲线（训练和验证）放在一起
         if mini_batch == -1:
             self.train_writer = SummaryWriter(
-                f'../visualization/{self.algorithm}-{dataset_name}-{partitioning}-{model_name}-C{clients_per_round}-E{epoch}-B{flag}-train-{self.lr}')
+                f'../visualization/{self.algorithm}-{dataset_name}-{partitioning}-{model_name}-C{clients_per_round}-E{epoch}-B{flag}-lr{self.lr}-train')
             self.test_writer = SummaryWriter(
-                f'../visualization/{self.algorithm}-{dataset_name}-{partitioning}-{model_name}-C{clients_per_round}-E{epoch}-B{flag}-val-{self.lr}')
+                f'../visualization/{self.algorithm}-{dataset_name}-{partitioning}-{model_name}-C{clients_per_round}-E{epoch}-B{flag}-lr{self.lr}-val')
         else:
             self.train_writer = SummaryWriter(
-                f'../visualization/{self.algorithm}-{dataset_name}-{partitioning}-{model_name}-C{clients_per_round}-E{epoch}-M{mini_batch}-train-{self.lr}')
+                f'../visualization/{self.algorithm}-{dataset_name}-{partitioning}-{model_name}-C{clients_per_round}-E{epoch}-M{mini_batch}-lr{self.lr}-train')
             self.test_writer = SummaryWriter(
-                f'../visualization/{self.algorithm}-{dataset_name}-{partitioning}-{model_name}-C{clients_per_round}-E{epoch}-M{mini_batch}-val-{self.lr}')
+                f'../visualization/{self.algorithm}-{dataset_name}-{partitioning}-{model_name}-C{clients_per_round}-E{epoch}-M{mini_batch}-lr{self.lr}-val')
 
     def load_pretrain(self):
         print(f"loading pre-trained model from {self.pretrain_model}")
@@ -102,7 +105,6 @@ class Server:
         trainloaders, testloaders = [], []
 
         if self.dataset_name == 'cifar10':
-            users = [i for i in range(100)]
             train_transform = transforms.Compose([
                 # transforms.RandomCrop(size=24, padding=8, fill=0, padding_mode='constant'),
                 transforms.RandomHorizontalFlip(p=0.5),
@@ -113,57 +115,60 @@ class Server:
                 transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
             ])
-            # train_transform = transforms.Compose([
-            #     transforms.ToTensor(),
-            #     transforms.Normalize(mean=[0.485, 0.456, 0.406],
-            #                          std=[0.229, 0.224, 0.225])
-            # ])
 
             test_transform = transforms.Compose([
                 transforms.ToTensor(),
                 transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
             ])
-            trainloaders, testloaders = get_cifar10_dataloaders(batch_size=self.batch_size,
-                                                                num_clients=self.all_clients_num,
-                                                                train_transform=train_transform,
-                                                                test_transform=test_transform)
-        elif self.dataset_name == 'mnist':
-            if self.partitioning == 'iid':
-                users = [i for i in range(100)]
-                train_transform = transforms.Compose([
-                    transforms.ToTensor(),
-                    transforms.Normalize(mean=[0.485],
-                                         std=[0.229])
-                ])
-
-                test_transform = transforms.Compose([
-                    transforms.ToTensor(),
-                    transforms.Normalize(mean=[0.485],
-                                         std=[0.229])
-                ])
-                trainloaders, testloaders = get_mnist_dataloaders(batch_size=self.batch_size,
-                                                                  num_clients=self.all_clients_num,
-                                                                  train_transform=train_transform,
-                                                                  test_transform=test_transform)
-            else:
-                users = [i for i in range(100)]
-                train_transform = transforms.Compose([
-                    transforms.ToTensor(),
-                    transforms.Normalize(mean=[0.485],
-                                         std=[0.229])
-                ])
-
-                test_transform = transforms.Compose([
-                    transforms.ToTensor(),
-                    transforms.Normalize(mean=[0.485],
-                                         std=[0.229])
-                ])
-                trainloaders, testloaders = get_mnist_dataloaders_niid(batch_size=self.batch_size,
+            users, trainloaders, testloaders = get_cifar10_dataloaders(batch_size=self.batch_size,
                                                                        num_clients=self.all_clients_num,
                                                                        train_transform=train_transform,
                                                                        test_transform=test_transform)
+        elif self.dataset_name == 'mnist':
+            if self.partitioning == 'iid':
+                train_transform = transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.485],
+                                         std=[0.229])
+                ])
 
+                test_transform = transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.485],
+                                         std=[0.229])
+                ])
+                users, trainloaders, testloaders = get_mnist_dataloaders(batch_size=self.batch_size,
+                                                                         num_clients=self.all_clients_num,
+                                                                         train_transform=train_transform,
+                                                                         test_transform=test_transform)
+            else:
+                train_transform = transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.485],
+                                         std=[0.229])
+                ])
+
+                test_transform = transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.485],
+                                         std=[0.229])
+                ])
+                users, trainloaders, testloaders = get_mnist_dataloaders_niid(batch_size=self.batch_size,
+                                                                              num_clients=self.all_clients_num,
+                                                                              train_transform=train_transform,
+                                                                              test_transform=test_transform)
+        elif self.dataset_name == 'mnist-prox':
+            train_transform = None
+            test_transform = None
+            users, trainloaders, testloaders = get_mnist_prox_dataloaders(batch_size=self.batch_size,
+                                                                          train_transform=train_transform,
+                                                                          test_transform=test_transform)
+        elif self.dataset_name == 'ml100k':
+            users, trainloaders, testloaders = get_ml100k_dataloaders(batch_size=self.batch_size,
+                                                                      num_clients=self.all_clients_num)
+        elif self.dataset_name == 'femnist-fedml':
+            users, trainloaders, testloaders = get_femnist_fedml_dataloaders(batch_size=self.batch_size)
         clients = [
             Client(user_id, trainloader=trainloaders[user_id], testloader=testloaders[user_id], model_name=model_name,
                    batch_size=batch_size,
@@ -298,6 +303,6 @@ class Server:
         path = f'../result/{self.dataset_name}/{self.partitioning}/{self.model_name}/C{self.clients_per_round}-E{self.epoch}-B{self.batch_size}'
         if not os.path.exists(path):
             os.makedirs(path)
-        path = f'{path}/model.pkl'
+        path = f'{path}/{self.algorithm}-model.pkl'
         print(f"模型已保存至：{path}")
         torch.save(self.params, path)
