@@ -1,27 +1,28 @@
 absl-py==0.11.0
 aioice==0.6.18
 aiortc==0.9.28
+asgiref @ file:///tmp/build/80754af9/asgiref_1605055780383/work
 astor==0.8.1
 async-generator==1.10
 attrs==20.3.0
 av==8.0.2
 backcall==0.2.0
-beautifulsoup4==4.9.1
+beautifulsoup4 @ file:///tmp/build/80754af9/beautifulsoup4_1601924105527/work
 bleach==3.2.1
-certifi==2020.6.20
-cffi==1.14.0
-chardet==3.0.4
+certifi==2020.12.5
+cffi @ file:///tmp/build/80754af9/cffi_1606255099073/work
+chardet @ file:///tmp/build/80754af9/chardet_1607706768982/work
 click==7.1.2
-conda==4.9.1
+conda==4.9.2
 conda-build==3.18.11
-conda-package-handling==1.7.0
+conda-package-handling @ file:///tmp/build/80754af9/conda-package-handling_1603018138503/work
 crc32c==2.2
 cryptography==2.9.2
--e git+https://github.com/nikitaivkin/csh.git@5b1d2da5df4616626475422fc1618c4fcbcf7a9b#egg=csvec
 cycler==0.10.0
 decorator==4.4.2
 defusedxml==0.6.0
 dill==0.3.3
+Django @ file:///tmp/build/80754af9/django_1606860386887/work
 entrypoints==0.3
 filelock==3.0.12
 Flask==1.1.2
@@ -32,17 +33,18 @@ glob2==0.7
 google-pasta==0.2.0
 grpcio==1.33.2
 h5py==2.10.0
-idna==2.8
+idna @ file:///tmp/build/80754af9/idna_1593446292537/work
 importlib-metadata==2.0.0
 importlib-resources==1.5.0
 install==1.3.4
 ipykernel==5.3.4
-ipython==7.16.1
-ipython-genutils==0.2.0
+ipython @ file:///tmp/build/80754af9/ipython_1593447368578/work
+ipython-genutils @ file:///tmp/build/80754af9/ipython_genutils_1606773439826/work
 ipywidgets==7.5.1
 itsdangerous==1.1.0
-jedi==0.17.1
+jedi @ file:///tmp/build/80754af9/jedi_1606932558467/work
 Jinja2==2.11.2
+joblib==0.17.0
 jsonpatch==1.26
 jsonpointer==2.0
 jsonschema==3.2.0
@@ -53,12 +55,12 @@ jupyter-core==4.6.3
 jupyterlab-pygments==0.1.2
 Keras-Applications==1.0.8
 Keras-Preprocessing==1.1.2
-kiwisolver==1.3.0
+kiwisolver @ file:///tmp/build/80754af9/kiwisolver_1604014532738/work
 libarchive-c==2.9
 lz4==3.0.2
 Markdown==3.3.3
-MarkupSafe==1.1.1
-matplotlib==3.2.2
+MarkupSafe @ file:///tmp/build/80754af9/markupsafe_1594371495811/work
+matplotlib @ file:///tmp/build/80754af9/matplotlib-base_1592846017414/work
 mistune==0.8.4
 mkl-fft==1.1.0
 mkl-random==1.1.1
@@ -73,53 +75,60 @@ nest-asyncio==1.4.2
 netifaces==0.10.9
 notebook==5.7.8
 numpy==1.16.4
+nvidia-ml-py3==7.352.0
 olefile==0.46
 openmined.threepio==0.2.0
 opt-einsum==3.3.0
 packaging==20.4
-pandas==1.1.3
+pandas @ file:///tmp/build/80754af9/pandas_1602088128026/work
 pandocfilters==1.4.3
 parso==0.7.0
-pexpect==4.8.0
+pexpect @ file:///tmp/build/80754af9/pexpect_1605563209008/work
 phe==1.4.0
-pickleshare==0.7.5
-Pillow==7.2.0
-pkginfo==1.5.0.1
+pickleshare @ file:///tmp/build/80754af9/pickleshare_1606932040724/work
+Pillow @ file:///tmp/build/80754af9/pillow_1594307325547/work
+pkginfo==1.6.1
 prometheus-client==0.8.0
-prompt-toolkit==3.0.5
+prompt-toolkit @ file:///tmp/build/80754af9/prompt-toolkit_1602688806899/work
 protobuf==3.13.0
-psutil==5.7.0
-ptyprocess==0.6.0
+psutil @ file:///tmp/build/80754af9/psutil_1598370249042/work
+psycopg2 @ file:///tmp/build/80754af9/psycopg2_1608147576006/work
+ptyprocess @ file:///tmp/build/80754af9/ptyprocess_1605560620615/work/dist/ptyprocess-0.6.0-py2.py3-none-any.whl
 pycosat==0.6.3
-pycparser==2.20
+pycparser @ file:///tmp/build/80754af9/pycparser_1594388511720/work
 pyee==8.1.0
-Pygments==2.6.1
+pyflakes==2.2.0
+Pygments @ file:///tmp/build/80754af9/pygments_1607368905949/work
 pylibsrtp==0.6.7
+pynvml==8.0.4
 pyOpenSSL==19.1.0
 pyparsing==2.4.7
 pyrsistent==0.17.3
-PySocks==1.7.1
+PySocks @ file:///tmp/build/80754af9/pysocks_1594394576006/work
 python-dateutil==2.8.1
 python-engineio==3.13.2
 python-socketio==4.6.0
-pytz==2020.1
+pytz @ file:///tmp/build/80754af9/pytz_1606604771399/work
 PyYAML==5.3.1
 pyzmq==19.0.2
 qtconsole==4.7.7
 QtPy==1.9.0
-requests==2.22.0
+requests @ file:///tmp/build/80754af9/requests_1608241421344/work
 requests-toolbelt==0.9.1
 RestrictedPython==5.1
 ruamel-yaml==0.15.87
+scikit-learn==0.19.2
 scipy==1.4.1
 Send2Trash==1.5.0
 shaloop==0.2.1a11
-six==1.14.0
+six @ file:///tmp/build/80754af9/six_1605205313296/work
+sklearn==0.0
 SoundFile==0.10.3.post1
-soupsieve==2.0.1
+soupsieve @ file:///tmp/build/80754af9/soupsieve_1607965878077/work
+sqlparse @ file:///tmp/build/80754af9/sqlparse_1602184451250/work
 syft==0.2.9
 syft-proto==0.5.3
-sympy==1.6.2
+sympy @ file:///tmp/build/80754af9/sympy_1597083144364/work
 tblib==1.6.0
 tensorboard==1.13.1
 tensorboardX==2.1
@@ -129,15 +138,16 @@ termcolor==1.1.0
 terminado==0.9.1
 testpath==0.4.4
 tf-encrypted==0.5.9
+threadpoolctl==2.1.0
 torch==1.4.0
 torchfile==0.1.0
 torchvision==0.5.0
-tornado==6.0.4
-tqdm==4.46.0
-traitlets==4.3.3
+tornado @ file:///tmp/build/80754af9/tornado_1606942283357/work
+tqdm @ file:///tmp/build/80754af9/tqdm_1607369919789/work
+traitlets @ file:///tmp/build/80754af9/traitlets_1602787416690/work
 urllib3==1.25.8
 visdom==0.1.8.9
-wcwidth==0.2.5
+wcwidth @ file:///tmp/build/80754af9/wcwidth_1593447189090/work
 webencodings==0.5.1
 websocket-client==0.57.0
 websockets==8.1
