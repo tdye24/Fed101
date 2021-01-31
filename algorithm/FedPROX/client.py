@@ -3,15 +3,25 @@ import copy
 import torch.optim as optim
 
 # models
-from models.fedavg.femnist import FEMNIST
-from models.fedavg.cifar10 import CIFAR10
-from models.fedavg.mnist import MNIST
+from models.fedprox.femnist.FEMNIST import FEMNIST
+from models.fedprox.cifar10.CIFAR10 import CIFAR10
+from models.fedprox.mnist.MNIST import MNIST
 
 
 class Client:
-    def __init__(self, user_id, trainloader, testloader, model_name: str, lr=3e-4, batch_size=10, mini_batch=-1, epoch=1,
-                 seed=123, lr_decay=0.99, decay_step=200, algorithm='fedavg'):
-        # torch.manual_seed(256)  # recurrence experiment
+    def __init__(self,
+                 user_id,
+                 trainloader,
+                 testloader,
+                 model_name: str,
+                 lr=3e-4,
+                 batch_size=10,
+                 mini_batch=-1,
+                 epoch=1,
+                 seed=123,
+                 lr_decay=0.99,
+                 decay_step=200):
+        torch.manual_seed(seed)  # recurrence experiment
         self.user_id = user_id
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.trainloader = trainloader
@@ -31,7 +41,9 @@ class Client:
         self.loss_list = []
         self.acc_list = []
 
-        self.samples_num = len(trainloader.dataset.__len__)
+        self.start_point = None
+
+        self.samples_num = trainloader.sampler.num_samples
 
     def select_model(self, model_name):
         model = None
@@ -63,12 +75,6 @@ class Client:
         criterion = torch.nn.CrossEntropyLoss().to(self.device)
         optimizer = optim.SGD(params=model.parameters(), lr=self.lr * self.lr_decay ** (round_th / self.decay_step))
 
-        # batch大小，可以指定batch_size，也可以指定mini_batch
-        if self.mini_batch == -1:
-            num_data = min(self.batch_size, self.samples_num)
-        else:
-            frac = min(1.0, self.mini_batch)
-            num_data = max(1, int(frac * self.samples_num))
         batch_loss = []
         for epoch in range(self.epoch):
             for step, (data, labels) in enumerate(self.trainloader):
@@ -76,15 +82,10 @@ class Client:
                 labels = labels.to(self.device)
                 optimizer.zero_grad()
                 output = model(data)
-                loss = None
-                if self.algorithm == 'fedavg':
-                    loss = criterion(output, labels)
-                elif self.algorithm == 'fedprox':
-                    difference = self.model_difference(self.start_point, model)
-                    loss = criterion(output, labels) + 0.5 * difference
+                difference = self.model_difference(self.start_point, model)
+                loss = criterion(output, labels) + 0.5 * difference
                 loss.backward()
                 optimizer.step()
-                # 最后一轮测一下batch_loss
                 if epoch == self.epoch - 1:
                     batch_loss.append(loss.item())
         num_train_samples, update = self.samples_num, self.get_params()
@@ -123,9 +124,7 @@ class Client:
         return input_data, target_data
 
     def get_params(self):
-        # ml TODO(待验证)
         return self.model.cpu().state_dict()
-        # return self.model.state_dict()
 
     def set_params(self, model_params):
         self.model.load_state_dict(model_params)

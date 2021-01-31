@@ -5,7 +5,7 @@ from torchvision import transforms
 import numpy as np
 
 from tensorboardX import SummaryWriter
-from algorithm.FedAVG.client import Client
+from algorithm.FedPROX.client import Client
 
 from data.mnist.MNIST_DATASET import get_mnist_dataloaders
 from data.cifar10.CIFAR10_DATASET import get_cifar10_dataloaders
@@ -13,9 +13,21 @@ from data.femnist.FEMNIST_DATASET import get_femnist_dataloaders
 
 
 class Server:
-    def __init__(self, seed=123, rounds=20, epoch=1, clients_per_round=1, eval_interval=1,
-                 dataset_name='femnist', model_name='cnn', lr=3e-4, batch_size=1, mini_batch=0.1, lr_decay=0.99,
-                 pretrain_model=None, decay_step=200, note=''):
+    def __init__(self,
+                 seed=123,
+                 rounds=20,
+                 epoch=1,
+                 clients_per_round=1,
+                 eval_interval=1,
+                 dataset_name='femnist',
+                 model_name='cnn',
+                 lr=3e-4,
+                 batch_size=1,
+                 mini_batch=0.1,
+                 lr_decay=0.99,
+                 pretrain_model=None,
+                 decay_step=200,
+                 note=''):
         self.clients = []
         self.seed = seed  # randomly sampling and model initialization
 
@@ -68,7 +80,7 @@ class Server:
         clients_per_round = self.clients_per_round
         epoch = self.epoch
 
-        if batch_size >= len(self.clients[0].trainloader.dataset.__len__):
+        if batch_size >= self.clients[0].trainloader.sampler.num_samples:
             flag = "N"
         else:
             flag = batch_size
@@ -76,14 +88,14 @@ class Server:
 
         if mini_batch == -1:
             self.train_writer = SummaryWriter(
-                f'../visualization/fedavg/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_train_{self.note}')
+                f'/home/tdye/Fed101/visualization/fedprox/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_train_{self.note}')
             self.test_writer = SummaryWriter(
-                f'../visualization/fedavg/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_val_{self.note}')
+                f'/home/tdye/Fed101/visualization/fedprox/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_val_{self.note}')
         else:
             self.train_writer = SummaryWriter(
-                f'../visualization/fedavg/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_M{mini_batch}_lr{self.lr}_train_{self.note}')
+                f'/home/tdye/Fed101/visualization/fedprox/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_M{mini_batch}_lr{self.lr}_train_{self.note}')
             self.test_writer = SummaryWriter(
-                f'../visualization/fedavg/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_M{mini_batch}_lr{self.lr}_val_{self.note}')
+                f'/home/tdye/Fed101/visualization/fedprox/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_M{mini_batch}_lr{self.lr}_val_{self.note}')
 
     def load_pretrain(self):
         print(f"loading pre-trained model from {self.pretrain_model}")
@@ -186,31 +198,6 @@ class Server:
         print(f"Training {len(self.clients)} clients!")
         for i in range(self.rounds):
             self.select_clients(round_th=i)
-            if i % self.eval_interval == 0:
-                print("--------------------------\n")
-                print("Round {}".format(i))
-                #
-                for c in self.clients:
-                    c.set_params(self.params)
-                acc_over_all, loss_over_all = self.test(dataset='test')
-                avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
-                print("#TEST# Avg acc: %.4f, Avg loss: %.4f" % (avg_acc_all * 100, avg_loss_all))
-
-                if avg_acc_all > self.optim['acc']:
-                    print("\033[1;31m" + "***Best Model***SAVE***" + "\033[0m")
-                    self.optim.update({'round': i, 'acc': avg_acc_all, 'params': self.params, 'loss': avg_loss_all})
-                    self.save_model()
-
-                self.test_writer.add_scalar('acc', avg_acc_all, global_step=i)
-                self.test_writer.add_scalar('loss', avg_loss_all, global_step=i)
-
-                # test on training data
-                acc_over_all, loss_over_all = self.test(dataset='train')
-                avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
-                print("#TRAIN# Avg acc: %.4f, Avg loss: %.4f" % (avg_acc_all * 100, avg_loss_all))
-
-                self.train_writer.add_scalar('acc', avg_acc_all, global_step=i)
-                self.train_writer.add_scalar('loss', avg_loss_all, global_step=i)
 
             for c in self.selected_clients:
                 c.set_params(self.params)
@@ -221,8 +208,33 @@ class Server:
             self.average()
 
             # clear
-            self.updates.clear()
-            self.selected_clients.clear()
+            self.updates = []
+            self.selected_clients = []
+
+            if i % self.eval_interval == 0:
+                print("--------------------------\n")
+                print("Round {}".format(i))
+                # test on training data
+                for c in self.clients:
+                    c.set_params(self.params)
+                acc_over_all, loss_over_all = self.test(dataset='train')
+                avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
+                print("#TRAIN# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
+
+                self.train_writer.add_scalar('acc', avg_acc_all, global_step=i)
+                self.train_writer.add_scalar('loss', avg_loss_all, global_step=i)
+                # test on testing data
+                acc_over_all, loss_over_all = self.test(dataset='test')
+                avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
+                print("#TEST# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
+
+                if avg_acc_all > self.optim['acc']:
+                    print("\033[1;31m" + "***Best Model***SAVE***" + "\033[0m")
+                    self.optim.update({'round': i, 'acc': avg_acc_all, 'params': self.params, 'loss': avg_loss_all})
+                    self.save_model()
+
+                self.test_writer.add_scalar('acc', avg_acc_all, global_step=i)
+                self.test_writer.add_scalar('loss', avg_loss_all, global_step=i)
 
     def test(self, dataset='test'):
         acc_list, loss_list = [], []
@@ -235,21 +247,27 @@ class Server:
 
     def print_optim(self):
         for c in self.clients:
-            c.set_params(self.params)  # 下发最终的模型
+            c.set_params(self.params)
         print("Round {}".format(self.rounds), end=' ')
+
+        acc_all, loss_all = self.test(dataset='train')
+        avg_acc_all, avg_loss_all = self.avg_metric(acc_all), self.avg_metric(loss_all)
+        print("#TRAIN# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
         acc_all, loss_all = self.test(dataset='test')
         avg_acc_all, avg_loss_all = self.avg_metric(acc_all), self.avg_metric(loss_all)
+        print("#TEST# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
 
         if avg_acc_all > self.optim['acc']:
             print("\033[1;31m" + "***Best Model***SAVE***" + "\033[0m")
             self.optim.update({'round': self.rounds, 'acc': avg_acc_all, 'params': self.params, 'loss': avg_loss_all})
             self.save_model()
+        print("\n")
         print(
             f"######Round: {self.optim['round']}, Optimal Federated Model, Average Accuracy Over All Clients(AAAC): "
             f"\033[1;32m{self.optim['acc']}\033[0m######")
 
     def save_model(self):
-        path = f'/home/tdye/Fed101/result/fedavg/{self.dataset_name}_{self.model_name}_C{self.clients_per_round}_E{self.epoch}_B{self.flag}_lr{self.lr}_val_{self.note}'
+        path = f'/home/tdye/Fed101/result/fedprox/{self.dataset_name}_{self.model_name}_C{self.clients_per_round}_E{self.epoch}_B{self.flag}_lr{self.lr}_val_{self.note}'
         if not os.path.exists(path):
             os.makedirs(path)
         path = f'{path}/model.pkl'

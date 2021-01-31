@@ -24,7 +24,7 @@ if __name__ == '__main__':
     note = args.note
 
     print(f"#############Running FedPROX With#############\n"
-          f"algorithm:\t\t\tFedAVG\n"
+          f"algorithm:\t\t\tFedPROX\n"
           f"dataset:\t\t\t{dataset}\n"
           f"clients:\t\t\t{clients_per_round}\n"
           f"model name:\t\t\t{model_name}\n"
