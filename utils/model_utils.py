@@ -1,8 +1,19 @@
 import json
-import numpy as np
-import sys
 import os
+import sys
 from collections import defaultdict
+
+import numpy as np
+
+# models
+from models.fedavg.cifar10.CIFAR10 import CIFAR10 as FedAVG_CIFAR10
+from models.fedavg.femnist.FEMNIST import FEMNIST as FedAVG_FEMNIST
+from models.fedavg.mnist.MNIST import MNIST as FedAVG_MNIST
+
+
+from models.fedsp.cifar10.CIFAR10 import CIFAR10 as FedSP_CIFAR10
+from models.fedsp.femnist.FEMNIST import FEMNIST as FedSP_FEMNIST
+from models.fedsp.mnist.MNIST import MNIST as FedSP_MNIST
 
 
 class Logger(object):
@@ -71,3 +82,29 @@ def read_data(train_data_dir, test_data_dir):
     assert train_clients.sort() == test_clients.sort()
 
     return train_clients, train_data, test_data
+
+
+def load_model(algorithm='fedavg', model_name=''):
+    model = None
+    if algorithm == 'fedsp':
+        if model_name == 'femnist':
+            model = FedSP_FEMNIST()
+        elif model_name == 'cifar10':
+            model = FedSP_CIFAR10()
+        elif model_name == 'mnist':
+            model = FedSP_MNIST()
+        else:
+            print("Unimplemented Model!")
+            exit(0)
+    elif algorithm == 'fedavg':
+        if model_name == 'femnist':
+            model = FedAVG_FEMNIST()
+        elif model_name == 'cifar10':
+            model = FedAVG_CIFAR10()
+        elif model_name == 'mnist':
+            model = FedAVG_MNIST()
+        else:
+            print("Unimplemented Model!")
+            exit(0)
+    assert model is not None
+    return model

@@ -8,7 +8,7 @@ from models.fedsp.mnist.MNIST import MNIST
 
 
 class Client:
-    def __init__(self, user_id, trainloader, testloader, model_name: str, lr=3e-4, batch_size=10, mini_batch=-1, epoch=1,
+    def __init__(self, user_id, trainloader, testloader, model_name: str, lr=3e-4, batch_size=10, epoch=1,
                  seed=123, lr_decay=0.99, decay_step=200):
         torch.manual_seed(seed)  # recurrence experiment
         self.user_id = user_id
@@ -24,7 +24,6 @@ class Client:
         self.decay_step = decay_step
 
         self.epoch = epoch
-        self.mini_batch = mini_batch
 
         self.loss_list = []
         self.acc_list = []

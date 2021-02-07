@@ -23,7 +23,6 @@ class Server:
                  model_name='cnn',
                  lr=3e-4,
                  batch_size=1,
-                 mini_batch=0.1,
                  lr_decay=0.99,
                  pretrain_model=None,
                  decay_step=200,
@@ -35,7 +34,6 @@ class Server:
         self.lr_decay = lr_decay
         self.decay_step = decay_step
 
-        self.mini_batch = mini_batch
         self.batch_size = batch_size
 
         self.dataset_name = dataset_name
@@ -69,8 +67,7 @@ class Server:
         self.clients = self.setup_clients(self.dataset_name,
                                           model_name=self.model_name,
                                           lr=self.lr,
-                                          batch_size=self.batch_size,
-                                          mini_batch=self.mini_batch)
+                                          batch_size=self.batch_size)
         assert self.clients_per_round <= len(self.clients)
         self.clients_per_round = min(self.clients_per_round, len(self.clients))
         if len(self.clients) > 0 and self.pretrain_model is None:
@@ -79,7 +76,6 @@ class Server:
             print("Error：length of clients list is zero!")
             exit(0)
         batch_size = self.batch_size
-        mini_batch = self.mini_batch
         dataset_name = self.dataset_name
         model_name = self.model_name
         clients_per_round = self.clients_per_round
@@ -363,4 +359,3 @@ class Server:
         path = f'{path}/model-{method}.pkl'
         print(f"model saved to：{path}")
         torch.save(self.global_params, path)
-

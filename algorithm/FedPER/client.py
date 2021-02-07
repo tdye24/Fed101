@@ -1,11 +1,8 @@
 import torch
-import copy
 import torch.optim as optim
 
 # models
-from models.fedprox.femnist.FEMNIST import FEMNIST
-from models.fedprox.cifar10.CIFAR10 import CIFAR10
-from models.fedprox.mnist.MNIST import MNIST
+from models.fedper.femnist.FEMNIST import FEMNIST
 
 
 class Client:
@@ -16,7 +13,6 @@ class Client:
                  model_name: str,
                  lr=3e-4,
                  batch_size=10,
-                 mini_batch=-1,
                  epoch=1,
                  seed=123,
                  lr_decay=0.99,
@@ -35,13 +31,9 @@ class Client:
         self.decay_step = decay_step
 
         self.epoch = epoch
-        self.seed = seed
-        self.mini_batch = mini_batch
 
         self.loss_list = []
         self.acc_list = []
-
-        self.start_point = None
 
         self.samples_num = trainloader.sampler.num_samples
 
@@ -49,25 +41,16 @@ class Client:
         model = None
         if model_name == 'femnist':
             model = FEMNIST()
-        elif model_name == 'cifar10':
-            model = CIFAR10()
-        elif model_name == 'mnist':
-            model = MNIST()
-        else:
-            print("Unimplemented Model!")
-            exit(0)
+        # elif model_name == 'cifar10':
+            # model = CIFAR10()
+        # elif model_name == 'mnist':
+        #     model = MNIST()
+        # else:
+        #     print("Unimplemented Model!")
+        #     exit(0)
         self.model = model.to(self.device)
 
-    @staticmethod
-    def model_difference(start_point, new_point):
-        loss = 0
-        old_params = start_point.state_dict()
-        for name, param in new_point.named_parameters():
-            loss += torch.norm(old_params[name] - param, 2)
-        return loss
-
     def train(self, round_th):
-        self.start_point = copy.deepcopy(self.model)
         model = self.model
         model.to(self.device)
         model.train()
@@ -82,14 +65,14 @@ class Client:
                 labels = labels.to(self.device)
                 optimizer.zero_grad()
                 output = model(data)
-                difference = self.model_difference(self.start_point, model)
-                loss = criterion(output, labels) + 0.1 / 2 * difference
+                loss = criterion(output, labels)
                 loss.backward()
                 optimizer.step()
+                # last epoch: batch_loss
                 if epoch == self.epoch - 1:
                     batch_loss.append(loss.item())
-        num_train_samples, update = self.samples_num, self.get_params()
-        return num_train_samples, update, sum(batch_loss) / len(batch_loss)
+        num_train_samples, base_update = self.samples_num, self.get_base_params()
+        return num_train_samples, base_update, sum(batch_loss) / len(batch_loss)
 
     def test(self, dataset='test'):
         model = self.model
@@ -115,16 +98,17 @@ class Client:
                 total_right += torch.sum(output == labels)
                 total_samples += len(labels)
             acc = float(total_right) / total_samples
-
+        # print(f"client {self.user_id}-{dataset}-total samples-{total_samples} acc: {acc}")
         return total_samples, acc, loss.item()
-
-    def process_data(self, raw_x, raw_y):
-        input_data, target_data = torch.tensor(raw_x).float().to(device=self.device), torch.tensor(raw_y).long().to(
-            device=self.device)
-        return input_data, target_data
 
     def get_params(self):
         return self.model.cpu().state_dict()
 
+    def get_base_params(self):
+        return self.model.cpu().base.state_dict()
+
     def set_params(self, model_params):
         self.model.load_state_dict(model_params)
+
+    def set_base_params(self, model_params):
+        self.model.base.load_state_dict(model_params)

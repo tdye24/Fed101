@@ -23,9 +23,7 @@ class Server:
                  model_name='cnn',
                  lr=3e-4,
                  batch_size=1,
-                 mini_batch=0.1,
                  lr_decay=0.99,
-                 pretrain_model=None,
                  decay_step=200,
                  note=''):
         self.clients = []
@@ -35,7 +33,6 @@ class Server:
         self.lr_decay = lr_decay
         self.decay_step = decay_step
 
-        self.mini_batch = mini_batch
         self.batch_size = batch_size
 
         self.dataset_name = dataset_name
@@ -48,7 +45,6 @@ class Server:
         self.epoch = epoch
         self.rounds = rounds
 
-        self.pretrain_model = pretrain_model  # pre-trained model directory
         self.eval_interval = eval_interval
 
         self.optim = {'round': 0, 'acc': -1.0, 'params': None, 'loss': 10e8}  # 第几轮，准确率，最高准确率对应的参数
@@ -62,19 +58,13 @@ class Server:
     def initiate(self):
         self.clients = self.setup_clients(model_name=self.model_name,
                                           lr=self.lr,
-                                          batch_size=self.batch_size,
-                                          mini_batch=self.mini_batch)
+                                          batch_size=self.batch_size)
         assert self.clients_per_round <= len(self.clients)
         self.clients_per_round = min(self.clients_per_round, len(self.clients))
-        if len(self.clients) > 0 and self.pretrain_model is None:
-            self.params = copy.deepcopy(self.clients[0].model.state_dict())
-        elif self.pretrain_model is not None:
-            self.load_pretrain()
-        else:
-            print("Error：length of clients list is zero!")
-            exit(0)
+
+        self.params = copy.deepcopy(self.clients[0].model.state_dict())
+
         batch_size = self.batch_size
-        mini_batch = self.mini_batch
         dataset_name = self.dataset_name
         model_name = self.model_name
         clients_per_round = self.clients_per_round
@@ -86,22 +76,12 @@ class Server:
             flag = batch_size
         self.flag = flag
 
-        if mini_batch == -1:
-            self.train_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedavg/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_train_{self.note}')
-            self.test_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedavg/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_val_{self.note}')
-        else:
-            self.train_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedavg/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_M{mini_batch}_lr{self.lr}_train_{self.note}')
-            self.test_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedavg/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_M{mini_batch}_lr{self.lr}_val_{self.note}')
+        self.train_writer = SummaryWriter(
+            f'/home/tdye/Fed101/visualization/fedavg/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_train_{self.note}')
+        self.test_writer = SummaryWriter(
+            f'/home/tdye/Fed101/visualization/fedavg/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_val_{self.note}')
 
-    def load_pretrain(self):
-        print(f"loading pre-trained model from {self.pretrain_model}")
-        self.params = torch.load(self.pretrain_model)
-
-    def setup_clients(self, model_name: str, batch_size: int, mini_batch: float, lr: float):
+    def setup_clients(self, model_name: str, batch_size: int, lr: float):
         users = []
         trainloaders, testloaders = [], []
         if self.dataset_name == 'cifar10':
@@ -129,7 +109,6 @@ class Server:
             ])
             # TODO(specify the num of all clients: default 100 for cifar10 dataset)
             users, trainloaders, testloaders = get_cifar10_dataloaders(batch_size=self.batch_size,
-                                                                       num_clients=100,
                                                                        train_transform=train_transform,
                                                                        test_transform=test_transform)
 
@@ -149,7 +128,6 @@ class Server:
                    testloader=testloaders[user_id],
                    model_name=model_name,
                    batch_size=batch_size,
-                   mini_batch=mini_batch,
                    lr=lr,
                    epoch=self.epoch,
                    lr_decay=self.lr_decay,

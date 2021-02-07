@@ -1,7 +1,6 @@
 import argparse
 
 DATASETS = ['femnist', 'cifar10', 'cifar100', 'synthetic_iid', 'mnist', 'mnist-prox', 'ml100k', 'femnist-fedml']
-PARTITIONING = ['iid', 'non-iid']
 
 
 def parse_args():
@@ -16,11 +15,6 @@ def parse_args():
                         help='name of model',
                         type=str,
                         required=True)
-
-    parser.add_argument('--pretrain-model',
-                        help='path of pre-trained model',
-                        type=str,
-                        default=None)
 
     parser.add_argument('--num-rounds',
                         help='number of communication rounds',
@@ -47,11 +41,6 @@ def parse_args():
                         type=int,
                         default=1)
 
-    parser.add_argument('--mini-batch',
-                        help='mini-batch when clients train on data',
-                        type=float,
-                        default=-1)
-
     parser.add_argument('--seed',
                         help='seed for random client sampling and batch splitting',
                         type=int,
@@ -69,7 +58,7 @@ def parse_args():
 
     parser.add_argument('--decay-step',
                         help='decay rate for learning rate',
-                        type=float,
+                        type=int,
                         default=200)
 
     parser.add_argument('--note',

@@ -1,7 +1,7 @@
 import sys
 from utils.args import parse_args
 from utils.model_utils import Logger
-from algorithm.FedAVG.server import Server
+from algorithm.FedPER.server import Server
 
 
 if __name__ == '__main__':
@@ -21,8 +21,8 @@ if __name__ == '__main__':
     decay_step = args.decay_step
     note = args.note
 
-    print(f"#############Running FedAVG With#############\n"
-          f"algorithm:\t\t\tFedAVG\n"
+    print(f"#############Running FedPER With#############\n"
+          f"algorithm:\t\t\tFedPER\n"
           f"dataset:\t\t\t{dataset}\n"
           f"clients:\t\t\t{clients_per_round}\n"
           f"model name:\t\t\t{model_name}\n"
