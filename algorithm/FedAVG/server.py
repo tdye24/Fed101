@@ -4,15 +4,17 @@ import torch
 from torchvision import transforms
 import numpy as np
 
+from algorithm.BASE import BASE
 from tensorboardX import SummaryWriter
 from algorithm.FedAVG.client import Client
 
+# dataloaders
 from data.mnist.MNIST_DATASET import get_mnist_dataloaders
 from data.cifar10.CIFAR10_DATASET import get_cifar10_dataloaders
 from data.femnist.FEMNIST_DATASET import get_femnist_dataloaders
 
 
-class Server:
+class Server(BASE):
     def __init__(self,
                  seed=123,
                  rounds=20,
@@ -20,68 +22,39 @@ class Server:
                  clients_per_round=1,
                  eval_interval=1,
                  dataset_name='femnist',
-                 model_name='cnn',
+                 model_name='femnist',
                  lr=3e-4,
                  batch_size=1,
                  lr_decay=0.99,
                  decay_step=200,
                  note=''):
-        self.clients = []
-        self.seed = seed  # randomly sampling and model initialization
+        BASE.__init__(self, algorithm='fedavg', seed=seed, epoch=epoch, model_name=model_name, lr=lr, batch_size=batch_size,
+                      lr_decay=lr_decay, decay_step=decay_step)
 
-        self.lr = lr
-        self.lr_decay = lr_decay
-        self.decay_step = decay_step
-
-        self.batch_size = batch_size
-
-        self.dataset_name = dataset_name
         self.model_name = model_name
-        self.params = None
+        self.dataset_name = dataset_name
+
+        self.params = self.model.state_dict()
         self.updates = []
         self.selected_clients = []
-
         self.clients_per_round = clients_per_round
-        self.epoch = epoch
         self.rounds = rounds
-
         self.eval_interval = eval_interval
+        self.note = note
 
         self.optim = {'round': 0, 'acc': -1.0, 'params': None, 'loss': 10e8}  # 第几轮，准确率，最高准确率对应的参数
 
-        self.train_writer = None
-        self.test_writer = None
-
-        self.flag = None
-        self.note = note
-
-    def initiate(self):
-        self.clients = self.setup_clients(model_name=self.model_name,
-                                          lr=self.lr,
-                                          batch_size=self.batch_size)
-        assert self.clients_per_round <= len(self.clients)
-        self.clients_per_round = min(self.clients_per_round, len(self.clients))
-
-        self.params = copy.deepcopy(self.clients[0].model.state_dict())
-
-        batch_size = self.batch_size
-        dataset_name = self.dataset_name
-        model_name = self.model_name
-        clients_per_round = self.clients_per_round
-        epoch = self.epoch
-
-        if batch_size >= self.clients[0].trainloader.sampler.num_samples:
-            flag = "N"
-        else:
-            flag = batch_size
-        self.flag = flag
-
         self.train_writer = SummaryWriter(
-            f'/home/tdye/Fed101/visualization/fedavg/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_train_{self.note}')
+            f'/home/tdye/Fed101/visualization/fedavg/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{batch_size}_lr{lr}_train_{note}')
         self.test_writer = SummaryWriter(
-            f'/home/tdye/Fed101/visualization/fedavg/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_val_{self.note}')
+            f'/home/tdye/Fed101/visualization/fedavg/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{batch_size}_lr{lr}_val_{note}')
 
-    def setup_clients(self, model_name: str, batch_size: int, lr: float):
+        self.clients = self.setup_clients()
+        assert self.clients_per_round <= len(self.clients)
+        self.surrogates = self.setup_surrogates()
+        assert len(self.surrogates) == clients_per_round
+
+    def setup_clients(self):
         users = []
         trainloaders, testloaders = [], []
         if self.dataset_name == 'cifar10':
@@ -126,14 +99,29 @@ class Server:
                    seed=self.seed,
                    trainloader=trainloaders[user_id],
                    testloader=testloaders[user_id],
-                   model_name=model_name,
-                   batch_size=batch_size,
-                   lr=lr,
+                   model_name=self.model_name,
+                   batch_size=self.batch_size,
+                   lr=self.lr,
                    epoch=self.epoch,
                    lr_decay=self.lr_decay,
                    decay_step=self.decay_step)
             for user_id in users]
         return clients
+
+    def setup_surrogates(self):
+        surrogates = [
+            Client(user_id=i,
+                   seed=self.seed,
+                   trainloader=None,
+                   testloader=None,
+                   model_name=self.model_name,
+                   batch_size=self.batch_size,
+                   lr=self.lr,
+                   epoch=self.epoch,
+                   lr_decay=self.lr_decay,
+                   decay_step=self.decay_step)
+            for i in range(self.clients_per_round)]
+        return surrogates
 
     def select_clients(self, round_th):
         np.random.seed(seed=self.seed + round_th)
@@ -177,9 +165,13 @@ class Server:
         for i in range(self.rounds):
             self.select_clients(round_th=i)
 
-            for c in self.selected_clients:
-                c.set_params(self.params)
-                num_train_samples, update, loss = c.train(round_th=i)
+            for k in range(len(self.selected_clients)):
+                surrogate = self.surrogates[k]
+                c = self.selected_clients[k]
+                surrogate.update(c)
+                surrogate.set_params(self.params)
+                num_train_samples, update, loss = surrogate.train(round_th=i)
+                c.update(surrogate)
                 self.updates.append((num_train_samples, copy.deepcopy(update)))
 
             # average
@@ -216,9 +208,10 @@ class Server:
 
     def test(self, dataset='test'):
         acc_list, loss_list = [], []
-
+        surrogate = self.surrogates[0]
         for c in self.clients:
-            num_test_samples, acc, loss = c.test(dataset=dataset)
+            surrogate.update(c)
+            num_test_samples, acc, loss = surrogate.test(dataset=dataset)
             acc_list.append((num_test_samples, acc))
             loss_list.append((num_test_samples, loss))
         return acc_list, loss_list
@@ -254,7 +247,7 @@ class Server:
             f"\033[1;32m{self.optim['acc']}\033[0m######")
 
     def save_model(self):
-        path = f'/home/tdye/Fed101/result/fedavg/{self.dataset_name}_{self.model_name}_C{self.clients_per_round}_E{self.epoch}_B{self.flag}_lr{self.lr}_{self.note}'
+        path = f'/home/tdye/Fed101/result/fedavg/{self.dataset_name}_{self.model_name}_C{self.clients_per_round}_E{self.epoch}_B{self.batch_size}_lr{self.lr}_{self.note}'
         if not os.path.exists(path):
             os.makedirs(path)
         path = f'{path}/model.pkl'
