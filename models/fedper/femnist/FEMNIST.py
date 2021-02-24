@@ -15,7 +15,7 @@ class FEMNIST(nn.Module):
         )
 
         self.personalization = nn.Sequential(
-            nn.Linear(64*7*7, 512),  # 乘2因为global_feat和local_feat拼在一起
+            nn.Linear(64*7*7, 512),
             nn.ReLU(inplace=True),
             nn.Linear(512, 62)
         )

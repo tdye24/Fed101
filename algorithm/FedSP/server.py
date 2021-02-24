@@ -87,29 +87,17 @@ class Server:
             flag = batch_size
         self.flag = flag
 
-        if mini_batch == -1:
-            self.M1_train_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedsp/M1_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_train_{self.note}')
-            self.M1_test_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedsp/M1_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_val_{self.note}')
+        self.M1_train_writer = SummaryWriter(
+            f'/home/tdye/Fed101/visualization/fedsp/M1_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_train_{self.note}')
+        self.M1_test_writer = SummaryWriter(
+            f'/home/tdye/Fed101/visualization/fedsp/M1_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_val_{self.note}')
 
-            self.M2_train_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedsp/M2_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_train_{self.note}')
-            self.M2_test_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedsp/M2_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_val_{self.note}')
+        self.M2_train_writer = SummaryWriter(
+            f'/home/tdye/Fed101/visualization/fedsp/M2_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_train_{self.note}')
+        self.M2_test_writer = SummaryWriter(
+            f'/home/tdye/Fed101/visualization/fedsp/M2_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_val_{self.note}')
 
-        else:
-            self.M1_train_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedsp/M1_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_M{mini_batch}_lr{self.lr}_train_{self.note}')
-            self.M1_test_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedsp/M1_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_M{mini_batch}_lr{self.lr}_val_{self.note}')
-
-            self.M2_train_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedsp/M2_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_M{mini_batch}_lr{self.lr}_train_{self.note}')
-            self.M2_test_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedsp/M2_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_M{mini_batch}_lr{self.lr}_val_{self.note}')
-
-    def setup_clients(self, dataset_name, model_name: str, batch_size: int, mini_batch: float, lr: float):
+    def setup_clients(self, dataset_name, model_name: str, batch_size: int, lr: float):
         users = []
         trainloaders, testloaders = [], []
 
@@ -138,7 +126,6 @@ class Server:
             ])
             # TODO(specify the num of all clients: default 100 for cifar10 dataset)
             users, trainloaders, testloaders = get_cifar10_dataloaders(batch_size=self.batch_size,
-                                                                       num_clients=100,
                                                                        train_transform=train_transform,
                                                                        test_transform=test_transform)
         elif self.dataset_name == 'mnist':
@@ -156,7 +143,6 @@ class Server:
                    testloader=testloaders[user_id],
                    model_name=model_name,
                    batch_size=batch_size,
-                   mini_batch=mini_batch,
                    lr=lr,
                    epoch=self.epoch,
                    lr_decay=self.lr_decay,
@@ -204,6 +190,25 @@ class Server:
         print(f"Training {len(self.clients)} clients!")
         for i in range(self.rounds):
             self.select_clients(round_th=i)
+
+            for c in self.selected_clients:
+                c.set_global_params(self.global_params)
+                num_train_samples, global_feature_update, loss = c.train(round_th=i)
+                self.updates.append((num_train_samples, copy.deepcopy(global_feature_update)))
+
+            # update have-seen client user_id set
+            last_round_user_ids = [client.user_id for client in self.selected_clients]
+            for user_id in last_round_user_ids:
+                self.have_seen_clients.add(user_id)
+            print(f"Have seen {len(self.have_seen_clients)}, {len(self.have_seen_clients) / len(self.clients)}")
+
+            # average
+            self.average()
+
+            # clear
+            self.updates = []
+            self.selected_clients = []
+
             if i % self.eval_interval == 0:
                 print("--------------------------\n")
                 print("Round {}".format(i))
@@ -214,7 +219,7 @@ class Server:
                 # TODO 方法1，对于未见过的clients不测试
                 # test on training data
                 for c in self.clients:
-                    c.set_global_params(self)
+                    c.set_global_params(self.global_params)
                 acc_over_all, loss_over_all = self.test(dataset='train', method='method1')
                 avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
                 print("#TRAIN# M1, Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
@@ -228,7 +233,8 @@ class Server:
 
                 if avg_acc_all > self.optim['M1_acc']:
                     print("\033[1;31m" + "***M1***Best Model***SAVE***" + "\033[0m")
-                    self.optim.update({'round': i, 'M1_acc': avg_acc_all, 'M1_params': self.global_params, 'M1_loss': avg_loss_all})
+                    self.optim.update(
+                        {'round': i, 'M1_acc': avg_acc_all, 'M1_params': self.global_params, 'M1_loss': avg_loss_all})
                     self.save_model(method='M1')
 
                 self.M1_test_writer.add_scalar('acc', avg_acc_all, global_step=i)
@@ -251,29 +257,12 @@ class Server:
 
                 if avg_acc_all > self.optim['M2_acc']:
                     print("\033[1;31m" + "***M2***Best Model***SAVE***" + "\033[0m")
-                    self.optim.update({'round': i, 'M2_acc': avg_acc_all, 'M2_params': self.global_params, 'M2_loss': avg_loss_all})
+                    self.optim.update(
+                        {'round': i, 'M2_acc': avg_acc_all, 'M2_params': self.global_params, 'M2_loss': avg_loss_all})
                     self.save_model(method='M2')
 
                 self.M2_test_writer.add_scalar('acc', avg_acc_all, global_step=i)
                 self.M2_test_writer.add_scalar('loss', avg_loss_all, global_step=i)
-
-            for c in self.selected_clients:
-                c.set_global_params(self.global_params)
-                num_train_samples, global_feature_update, loss = c.train(round_th=i)
-                self.updates.append((num_train_samples, copy.deepcopy(global_feature_update)))
-
-            # update have-seen client user_id set
-            last_round_user_ids = [client.user_id for client in self.selected_clients]
-            for client in last_round_user_ids:
-                self.have_seen_clients.add(client.user_id)
-            print(f"Have seen {len(self.have_seen_clients)}, {len(self.have_seen_clients) / len(self.clients)}")
-
-            # average
-            self.average()
-
-            # clear
-            self.updates = []
-            self.selected_clients = []
 
     def test(self, dataset='test', method='method1'):
         acc_list, loss_list = [], []
@@ -281,7 +270,7 @@ class Server:
         # 方法1，对于未见过的clients不测试
         if method == 'method1':
             for c in self.clients:
-                if c in self.have_seen_clients:
+                if c.user_id in self.have_seen_clients:
                     num_test_samples, acc, loss = c.test(dataset=dataset)
                     acc_list.append((num_test_samples, acc))
                     loss_list.append((num_test_samples, loss))

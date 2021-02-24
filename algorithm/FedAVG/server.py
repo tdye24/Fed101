@@ -176,6 +176,19 @@ class Server:
         print(f"Training {len(self.clients)} clients!")
         for i in range(self.rounds):
             self.select_clients(round_th=i)
+
+            for c in self.selected_clients:
+                c.set_params(self.params)
+                num_train_samples, update, loss = c.train(round_th=i)
+                self.updates.append((num_train_samples, copy.deepcopy(update)))
+
+            # average
+            self.average()
+
+            # clear
+            self.updates = []
+            self.selected_clients = []
+
             if i % self.eval_interval == 0:
                 print("--------------------------\n")
                 print("Round {}".format(i))
@@ -201,18 +214,6 @@ class Server:
                 self.test_writer.add_scalar('acc', avg_acc_all, global_step=i)
                 self.test_writer.add_scalar('loss', avg_loss_all, global_step=i)
 
-            for c in self.selected_clients:
-                c.set_params(self.params)
-                num_train_samples, update, loss = c.train(round_th=i)
-                self.updates.append((num_train_samples, copy.deepcopy(update)))
-
-            # average
-            self.average()
-
-            # clear
-            self.updates = []
-            self.selected_clients = []
-
     def test(self, dataset='test'):
         acc_list, loss_list = [], []
 
@@ -229,10 +230,19 @@ class Server:
 
         acc_all, loss_all = self.test(dataset='train')
         avg_acc_all, avg_loss_all = self.avg_metric(acc_all), self.avg_metric(loss_all)
+
         print("#TRAIN# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
+
+        self.train_writer.add_scalar('acc', avg_acc_all, global_step=self.rounds)
+        self.train_writer.add_scalar('loss', avg_loss_all, global_step=self.rounds)
+
         acc_all, loss_all = self.test(dataset='test')
         avg_acc_all, avg_loss_all = self.avg_metric(acc_all), self.avg_metric(loss_all)
+
         print("#TEST# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
+
+        self.test_writer.add_scalar('acc', avg_acc_all, global_step=self.rounds)
+        self.test_writer.add_scalar('loss', avg_loss_all, global_step=self.rounds)
 
         if avg_acc_all > self.optim['acc']:
             print("\033[1;31m" + "***Best Model***SAVE***" + "\033[0m")
