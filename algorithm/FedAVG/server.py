@@ -13,6 +13,11 @@ from data.mnist.MNIST_DATASET import get_mnist_dataloaders
 from data.cifar10.CIFAR10_DATASET import get_cifar10_dataloaders
 from data.femnist.FEMNIST_DATASET import get_femnist_dataloaders
 
+from torch.backends import cudnn
+
+cudnn.benchmark = False
+cudnn.deterministic = True
+
 
 class Server(BASE):
     def __init__(self,
@@ -28,8 +33,8 @@ class Server(BASE):
                  lr_decay=0.99,
                  decay_step=200,
                  note=''):
-        BASE.__init__(self, algorithm='fedavg', seed=seed, epoch=epoch, model_name=model_name, lr=lr, batch_size=batch_size,
-                      lr_decay=lr_decay, decay_step=decay_step)
+        BASE.__init__(self, algorithm='fedavg', seed=seed, epoch=epoch, model_name=model_name,
+                      lr=lr, batch_size=batch_size, lr_decay=lr_decay, decay_step=decay_step)
 
         self.model_name = model_name
         self.dataset_name = dataset_name
@@ -42,7 +47,7 @@ class Server(BASE):
         self.eval_interval = eval_interval
         self.note = note
 
-        self.optim = {'round': 0, 'acc': -1.0, 'params': None, 'loss': 10e8}  # 第几轮，准确率，最高准确率对应的参数
+        self.optim = {'round': 0, 'acc': -1.0, 'params': None, 'loss': 10e8}
 
         self.train_writer = SummaryWriter(
             f'/home/tdye/Fed101/visualization/fedavg/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{batch_size}_lr{lr}_train_{note}')
@@ -51,6 +56,7 @@ class Server(BASE):
 
         self.clients = self.setup_clients()
         assert self.clients_per_round <= len(self.clients)
+
         self.surrogates = self.setup_surrogates()
         assert len(self.surrogates) == clients_per_round
 
@@ -100,7 +106,6 @@ class Server(BASE):
                    trainloader=trainloaders[user_id],
                    testloader=testloaders[user_id],
                    model_name=self.model_name,
-                   batch_size=self.batch_size,
                    lr=self.lr,
                    epoch=self.epoch,
                    lr_decay=self.lr_decay,
@@ -115,7 +120,6 @@ class Server(BASE):
                    trainloader=None,
                    testloader=None,
                    model_name=self.model_name,
-                   batch_size=self.batch_size,
                    lr=self.lr,
                    epoch=self.epoch,
                    lr_decay=self.lr_decay,
@@ -129,7 +133,7 @@ class Server(BASE):
         self.selected_clients = selected_clients
 
     def average(self):
-        updates = copy.deepcopy(self.updates)
+        updates = self.updates
         total_weight = 0
         (client_samples, new_params) = updates[0]
 
@@ -146,7 +150,7 @@ class Server(BASE):
                 else:
                     new_params[k] += client_params[k] * w
         # update global model params
-        self.params = copy.deepcopy(new_params)
+        self.params = new_params
 
     @staticmethod
     def avg_metric(metric_list):
@@ -168,9 +172,11 @@ class Server(BASE):
             for k in range(len(self.selected_clients)):
                 surrogate = self.surrogates[k]
                 c = self.selected_clients[k]
+                # surrogate <-- c
                 surrogate.update(c)
                 surrogate.set_params(self.params)
                 num_train_samples, update, loss = surrogate.train(round_th=i)
+                # c <-- surrogate
                 c.update(surrogate)
                 self.updates.append((num_train_samples, copy.deepcopy(update)))
 
@@ -185,8 +191,6 @@ class Server(BASE):
                 print("--------------------------\n")
                 print("Round {}".format(i))
                 # test on training data
-                for c in self.clients:
-                    c.set_params(self.params)
                 acc_over_all, loss_over_all = self.test(dataset='train')
                 avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
                 print("#TRAIN# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
@@ -201,7 +205,7 @@ class Server(BASE):
                 if avg_acc_all > self.optim['acc']:
                     print("\033[1;31m" + "***Best Model***SAVE***" + "\033[0m")
                     self.optim.update({'round': i, 'acc': avg_acc_all, 'params': self.params, 'loss': avg_loss_all})
-                    self.save_model()
+                    # self.save_model()
 
                 self.test_writer.add_scalar('acc', avg_acc_all, global_step=i)
                 self.test_writer.add_scalar('loss', avg_loss_all, global_step=i)
@@ -211,6 +215,7 @@ class Server(BASE):
         surrogate = self.surrogates[0]
         for c in self.clients:
             surrogate.update(c)
+            surrogate.set_params(self.params)
             num_test_samples, acc, loss = surrogate.test(dataset=dataset)
             acc_list.append((num_test_samples, acc))
             loss_list.append((num_test_samples, loss))
@@ -240,7 +245,7 @@ class Server(BASE):
         if avg_acc_all > self.optim['acc']:
             print("\033[1;31m" + "***Best Model***SAVE***" + "\033[0m")
             self.optim.update({'round': self.rounds, 'acc': avg_acc_all, 'params': self.params, 'loss': avg_loss_all})
-            self.save_model()
+            # self.save_model()
         print("\n")
         print(
             f"######Round: {self.optim['round']}, Optimal Federated Model, Average Accuracy Over All Clients(AAAC): "

@@ -5,10 +5,10 @@ from algorithm.BASE import BASE
 
 
 class Client(BASE):
-    def __init__(self, user_id, trainloader, testloader, model_name: str, lr=3e-4, batch_size=10, mini_batch=-1, epoch=1,
+    def __init__(self, user_id, trainloader, testloader, model_name: str, lr=3e-4, epoch=1,
                  seed=123, lr_decay=0.99, decay_step=200):
-        BASE.__init__(self, algorithm='fedavg', seed=seed, epoch=epoch, model_name=model_name, lr=lr, lr_decay=lr_decay, decay_step=decay_step)
-        torch.manual_seed(seed)  # recurrence experiment
+        BASE.__init__(self, algorithm='fedavg', seed=seed, epoch=epoch, model_name=model_name,
+                      lr=lr, lr_decay=lr_decay, decay_step=decay_step)
 
         self.user_id = user_id
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
