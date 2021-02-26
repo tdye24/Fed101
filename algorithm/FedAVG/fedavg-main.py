@@ -9,7 +9,7 @@ from algorithm.FedAVG.server import Server
 
 
 if __name__ == '__main__':
-    sys.stdout = Logger()
+    # sys.stdout = Logger()
 
     args = parse_args()
     dataset = args.dataset
@@ -32,9 +32,9 @@ if __name__ == '__main__':
           f"model name:\t\t\t{model_name}\n"
           f"epochs:\t\t\t\t{epoch}\n"
           f"num rounds:\t\t\t{num_rounds}\n"
-          f"eval interval:\t\t{eval_interval}\n"
+          f"eval interval:\t\t\t{eval_interval}\n"
           f"batch size:\t\t\t{batch_size}\n"
-          f"lr:\t\t\t\t\t{lr}\n"
+          f"lr:\t\t\t\t{lr}\n"
           f"lr-decay:\t\t\t{lr_decay}\n"
           f"decay_step:\t\t\t{decay_step}\n"
           f"note:\t\t\t\t{note}")

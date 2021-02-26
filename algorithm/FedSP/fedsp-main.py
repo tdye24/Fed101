@@ -9,7 +9,7 @@ from algorithm.FedSP.server import Server
 
 
 if __name__ == '__main__':
-    sys.stdout = Logger()
+    # sys.stdout = Logger()
 
     args = parse_args()
     dataset = args.dataset
