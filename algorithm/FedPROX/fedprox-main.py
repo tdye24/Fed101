@@ -47,6 +47,5 @@ if __name__ == '__main__':
                     lr_decay=lr_decay,
                     decay_step=decay_step,
                     note=note)
-    server.initiate()
     server.federate()
     server.print_optim()
