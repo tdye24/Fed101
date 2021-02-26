@@ -4,15 +4,22 @@ import torch
 from torchvision import transforms
 import numpy as np
 
+from algorithm.BASE import BASE
 from tensorboardX import SummaryWriter
 from algorithm.FedSP.client import Client
 
+# dataloaders
 from data.mnist.MNIST_DATASET import get_mnist_dataloaders
 from data.cifar10.CIFAR10_DATASET import get_cifar10_dataloaders
 from data.femnist.FEMNIST_DATASET import get_femnist_dataloaders
 
+from torch.backends import cudnn
 
-class Server:
+cudnn.benchmark = False
+cudnn.deterministic = True
+
+
+class Server(BASE):
     def __init__(self,
                  seed=123,
                  rounds=20,
@@ -20,103 +27,42 @@ class Server:
                  clients_per_round=1,
                  eval_interval=1,
                  dataset_name='femnist',
-                 model_name='cnn',
+                 model_name='femnist',
                  lr=3e-4,
                  batch_size=1,
-                 mini_batch=0.1,
                  lr_decay=0.99,
-                 pretrain_model=None,
                  decay_step=200,
                  note=''):
-        self.clients = []
-        self.seed = seed  # randomly sampling
+        BASE.__init__(self, algorithm='fedsp', seed=seed, epoch=epoch, model_name=model_name, lr=lr, batch_size=batch_size,
+                      lr_decay=lr_decay, decay_step=decay_step)
 
-        self.lr = lr
-        self.lr_decay = lr_decay
-        self.decay_step = decay_step
-
-        self.mini_batch = mini_batch
-        self.batch_size = batch_size
-
-        self.dataset_name = dataset_name
         self.model_name = model_name
-        self.global_params = None
+        self.dataset_name = dataset_name
+
+        self.global_feature_params = self.model.global_feature.state_dict()
         self.updates = []
         self.selected_clients = []
-        self.have_seen_clients = set()  # user_id set, not client set, not numpy
-
         self.clients_per_round = clients_per_round
-        self.epoch = epoch
         self.rounds = rounds
-
-        self.pretrain_model = pretrain_model  # pre-trained model  directory
         self.eval_interval = eval_interval
-
-        self.optim = {'round': 0,
-                      'M1_acc': -1.0, 'M2_acc': -1.0,
-                      'M1_params': None, 'M2_params': None,
-                      'M1_loss': 10e8, 'M2_loss': 10e8}
-
-        self.M1_train_writer = None
-        self.M1_test_writer = None
-        self.M2_train_writer = None
-        self.M2_test_writer = None
-
-        self.flag = None
         self.note = note
 
-    def initiate(self):
-        self.clients = self.setup_clients(self.dataset_name,
-                                          model_name=self.model_name,
-                                          lr=self.lr,
-                                          batch_size=self.batch_size,
-                                          mini_batch=self.mini_batch)
+        self.optim = {'round': 0, 'acc': -1.0, 'global_feature_params': None, 'loss': 10e8}  # 第几轮，准确率，最高准确率对应的参数
+
+        self.train_writer = SummaryWriter(
+            f'/home/tdye/Fed101/visualization/fedsp/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{batch_size}_lr{lr}_train_{note}')
+        self.test_writer = SummaryWriter(
+            f'/home/tdye/Fed101/visualization/fedsp/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{batch_size}_lr{lr}_val_{note}')
+
+        self.clients = self.setup_clients()
         assert self.clients_per_round <= len(self.clients)
-        self.clients_per_round = min(self.clients_per_round, len(self.clients))
-        if len(self.clients) > 0 and self.pretrain_model is None:
-            self.global_params = copy.deepcopy(self.clients[0].get_global_params())
-        else:
-            print("Error：length of clients list is zero!")
-            exit(0)
-        batch_size = self.batch_size
-        mini_batch = self.mini_batch
-        dataset_name = self.dataset_name
-        model_name = self.model_name
-        clients_per_round = self.clients_per_round
-        epoch = self.epoch
 
-        if batch_size >= self.clients[0].trainloader.sampler.num_samples:
-            flag = "N"
-        else:
-            flag = batch_size
-        self.flag = flag
+        self.surrogates = self.setup_surrogates()
+        assert len(self.surrogates) == clients_per_round
 
-        if mini_batch == -1:
-            self.M1_train_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedsp/M1_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_train_{self.note}')
-            self.M1_test_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedsp/M1_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_val_{self.note}')
-
-            self.M2_train_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedsp/M2_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_train_{self.note}')
-            self.M2_test_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedsp/M2_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{flag}_lr{self.lr}_val_{self.note}')
-
-        else:
-            self.M1_train_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedsp/M1_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_M{mini_batch}_lr{self.lr}_train_{self.note}')
-            self.M1_test_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedsp/M1_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_M{mini_batch}_lr{self.lr}_val_{self.note}')
-
-            self.M2_train_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedsp/M2_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_M{mini_batch}_lr{self.lr}_train_{self.note}')
-            self.M2_test_writer = SummaryWriter(
-                f'/home/tdye/Fed101/visualization/fedsp/M2_{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_M{mini_batch}_lr{self.lr}_val_{self.note}')
-
-    def setup_clients(self, dataset_name, model_name: str, batch_size: int, mini_batch: float, lr: float):
+    def setup_clients(self):
         users = []
         trainloaders, testloaders = [], []
-
         if self.dataset_name == 'cifar10':
             # data augmentation
             # train_transform = transforms.Compose([
@@ -142,9 +88,9 @@ class Server:
             ])
             # TODO(specify the num of all clients: default 100 for cifar10 dataset)
             users, trainloaders, testloaders = get_cifar10_dataloaders(batch_size=self.batch_size,
-                                                                       num_clients=100,
                                                                        train_transform=train_transform,
                                                                        test_transform=test_transform)
+
         elif self.dataset_name == 'mnist':
             train_transform = None
             test_transform = None
@@ -153,19 +99,33 @@ class Server:
                                                                      test_transform=test_transform)
         elif self.dataset_name == 'femnist':
             users, trainloaders, testloaders = get_femnist_dataloaders(batch_size=self.batch_size)
+
         clients = [
             Client(user_id=user_id,
                    seed=self.seed,
                    trainloader=trainloaders[user_id],
                    testloader=testloaders[user_id],
-                   model_name=model_name,
-                   batch_size=batch_size,
-                   mini_batch=mini_batch,
-                   lr=lr,
+                   model_name=self.model_name,
+                   lr=self.lr,
                    epoch=self.epoch,
                    lr_decay=self.lr_decay,
-                   decay_step=self.decay_step) for user_id in users]
+                   decay_step=self.decay_step)
+            for user_id in users]
         return clients
+
+    def setup_surrogates(self):
+        surrogates = [
+            Client(user_id=i,
+                   seed=self.seed,
+                   trainloader=None,
+                   testloader=None,
+                   model_name=self.model_name,
+                   lr=self.lr,
+                   epoch=self.epoch,
+                   lr_decay=self.lr_decay,
+                   decay_step=self.decay_step)
+            for i in range(self.clients_per_round)]
+        return surrogates
 
     def select_clients(self, round_th):
         np.random.seed(seed=self.seed + round_th)
@@ -173,7 +133,7 @@ class Server:
         self.selected_clients = selected_clients
 
     def average(self):
-        updates = copy.deepcopy(self.updates)
+        updates = self.updates
         total_weight = 0
         (client_samples, new_params) = updates[0]
 
@@ -190,7 +150,7 @@ class Server:
                 else:
                     new_params[k] += client_params[k] * w
         # update global model params
-        self.global_params = copy.deepcopy(new_params)
+        self.global_feature_params = new_params
 
     @staticmethod
     def avg_metric(metric_list):
@@ -208,69 +168,17 @@ class Server:
         print(f"Training {len(self.clients)} clients!")
         for i in range(self.rounds):
             self.select_clients(round_th=i)
-            if i % self.eval_interval == 0:
-                print("--------------------------\n")
-                print("Round {}".format(i))
-                # 2种测试方法
-                # 1. 对于未见过的clients不测试
-                # 2. 对于未见过的clients，用本地随机初始化的模型测试
 
-                # TODO 方法1，对于未见过的clients不测试
-                # test on training data
-                for c in self.clients:
-                    c.set_global_params(self)
-                acc_over_all, loss_over_all = self.test(dataset='train', method='method1')
-                avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
-                print("#TRAIN# M1, Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
-
-                self.M1_train_writer.add_scalar('acc', avg_acc_all, global_step=i)
-                self.M1_train_writer.add_scalar('loss', avg_loss_all, global_step=i)
-                # test on testing data
-                acc_over_all, loss_over_all = self.test(dataset='test', method='method1')
-                avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
-                print("#TEST# M1, Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
-
-                if avg_acc_all > self.optim['M1_acc']:
-                    print("\033[1;31m" + "***M1***Best Model***SAVE***" + "\033[0m")
-                    self.optim.update({'round': i, 'M1_acc': avg_acc_all, 'M1_params': self.global_params, 'M1_loss': avg_loss_all})
-                    self.save_model(method='M1')
-
-                self.M1_test_writer.add_scalar('acc', avg_acc_all, global_step=i)
-                self.M1_test_writer.add_scalar('loss', avg_loss_all, global_step=i)
-
-                # TODO 方法2，对于未见过的clients，用本地随机初始化的模型测试
-                # test on training data
-                # for c in self.clients:
-                #     c.set_global_params(self)
-                acc_over_all, loss_over_all = self.test(dataset='train', method='method2')
-                avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
-                print("#TRAIN# M2, Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
-
-                self.M2_train_writer.add_scalar('acc', avg_acc_all, global_step=i)
-                self.M2_train_writer.add_scalar('loss', avg_loss_all, global_step=i)
-                # test on testing data
-                acc_over_all, loss_over_all = self.test(dataset='test', method='method2')
-                avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
-                print("#TEST# M2, Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
-
-                if avg_acc_all > self.optim['M2_acc']:
-                    print("\033[1;31m" + "***M2***Best Model***SAVE***" + "\033[0m")
-                    self.optim.update({'round': i, 'M2_acc': avg_acc_all, 'M2_params': self.global_params, 'M2_loss': avg_loss_all})
-                    self.save_model(method='M2')
-
-                self.M2_test_writer.add_scalar('acc', avg_acc_all, global_step=i)
-                self.M2_test_writer.add_scalar('loss', avg_loss_all, global_step=i)
-
-            for c in self.selected_clients:
-                c.set_global_params(self.global_params)
-                num_train_samples, global_feature_update, loss = c.train(round_th=i)
-                self.updates.append((num_train_samples, copy.deepcopy(global_feature_update)))
-
-            # update have-seen client user_id set
-            last_round_user_ids = [client.user_id for client in self.selected_clients]
-            for client in last_round_user_ids:
-                self.have_seen_clients.add(client.user_id)
-            print(f"Have seen {len(self.have_seen_clients)}, {len(self.have_seen_clients) / len(self.clients)}")
+            for k in range(len(self.selected_clients)):
+                surrogate = self.surrogates[k]
+                c = self.selected_clients[k]
+                # surrogate <-- c
+                surrogate.update(c)
+                surrogate.set_global_feature_params(self.global_feature_params)
+                num_train_samples, update, loss = surrogate.train(round_th=i)
+                # c <-- surrogate
+                c.update(surrogate)
+                self.updates.append((num_train_samples, copy.deepcopy(update)))
 
             # average
             self.average()
@@ -279,88 +187,74 @@ class Server:
             self.updates = []
             self.selected_clients = []
 
-    def test(self, dataset='test', method='method1'):
-        acc_list, loss_list = [], []
+            if i % self.eval_interval == 0:
+                print("--------------------------\n")
+                print("Round {}".format(i))
+                # test on training data
+                acc_over_all, loss_over_all = self.test(dataset='train')
+                avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
+                print("#TRAIN# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
 
-        # 方法1，对于未见过的clients不测试
-        if method == 'method1':
-            for c in self.clients:
-                if c in self.have_seen_clients:
-                    num_test_samples, acc, loss = c.test(dataset=dataset)
-                    acc_list.append((num_test_samples, acc))
-                    loss_list.append((num_test_samples, loss))
-        # 方法2，对于未见过的clients，用本地随机初始化的模型测试
-        elif method == 'method2':
-            for c in self.clients:
-                num_test_samples, acc, loss = c.test(dataset=dataset)
-                acc_list.append((num_test_samples, acc))
-                loss_list.append((num_test_samples, loss))
+                self.train_writer.add_scalar('acc', avg_acc_all, global_step=i)
+                self.train_writer.add_scalar('loss', avg_loss_all, global_step=i)
+                # test on testing data
+                acc_over_all, loss_over_all = self.test(dataset='test')
+                avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
+                print("#TEST# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
+
+                if avg_acc_all > self.optim['acc']:
+                    print("\033[1;31m" + "***Best Model***SAVE***" + "\033[0m")
+                    self.optim.update({'round': i, 'acc': avg_acc_all, 'global_feature_params': self.global_feature_params, 'loss': avg_loss_all})
+                    # self.save_model()
+
+                self.test_writer.add_scalar('acc', avg_acc_all, global_step=i)
+                self.test_writer.add_scalar('loss', avg_loss_all, global_step=i)
+
+    def test(self, dataset='test'):
+        acc_list, loss_list = [], []
+        surrogate = self.surrogates[0]
+        for c in self.clients:
+            surrogate.update(c)
+            surrogate.set_global_feature_params(self.global_feature_params)
+            num_test_samples, acc, loss = surrogate.test(dataset=dataset)
+            acc_list.append((num_test_samples, acc))
+            loss_list.append((num_test_samples, loss))
         return acc_list, loss_list
 
     def print_optim(self):
-        print("Round {}".format(self.rounds), end=' ')
-        # TODO 方法1，对于未见过的clients不测试
-        # test on training data
         for c in self.clients:
-            c.set_global_params(self)
-        acc_over_all, loss_over_all = self.test(dataset='train', method='method1')
-        avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
-        print("#TRAIN# M1, Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
+            c.set_global_feature_params(self.global_feature_params)
+        print("Round {}".format(self.rounds), end=' ')
 
-        self.M1_train_writer.add_scalar('acc', avg_acc_all, global_step=self.rounds)
-        self.M1_train_writer.add_scalar('loss', avg_loss_all, global_step=self.rounds)
-        # test on testing data
-        acc_over_all, loss_over_all = self.test(dataset='test', method='method1')
-        avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
-        print("#TEST# M1, Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
+        acc_all, loss_all = self.test(dataset='train')
+        avg_acc_all, avg_loss_all = self.avg_metric(acc_all), self.avg_metric(loss_all)
 
-        self.M1_test_writer.add_scalar('acc', avg_acc_all, global_step=self.rounds)
-        self.M1_test_writer.add_scalar('loss', avg_loss_all, global_step=self.rounds)
+        print("#TRAIN# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
 
-        if avg_acc_all > self.optim['M1_acc']:
-            print("\033[1;31m" + "***M1***Best Model***SAVE***" + "\033[0m")
-            self.optim.update(
-                {'round': self.rounds, 'M1_acc': avg_acc_all, 'M1_params': self.global_params, 'M1_loss': avg_loss_all})
-            self.save_model(method='M1')
+        self.train_writer.add_scalar('acc', avg_acc_all, global_step=self.rounds)
+        self.train_writer.add_scalar('loss', avg_loss_all, global_step=self.rounds)
 
-        # TODO 方法2，对于未见过的clients，用本地随机初始化的模型测试
-        # test on training data
-        # for c in self.clients:
-        #     c.set_global_params(self)
-        acc_over_all, loss_over_all = self.test(dataset='train', method='method2')
-        avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
-        print("#TRAIN# M2, Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
+        acc_all, loss_all = self.test(dataset='test')
+        avg_acc_all, avg_loss_all = self.avg_metric(acc_all), self.avg_metric(loss_all)
 
-        self.M2_train_writer.add_scalar('acc', avg_acc_all, global_step=self.rounds)
-        self.M2_train_writer.add_scalar('loss', avg_loss_all, global_step=self.rounds)
+        print("#TEST# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
 
-        # test on testing data
-        acc_over_all, loss_over_all = self.test(dataset='test', method='method2')
-        avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
-        print("#TEST# M2, Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
+        self.test_writer.add_scalar('acc', avg_acc_all, global_step=self.rounds)
+        self.test_writer.add_scalar('loss', avg_loss_all, global_step=self.rounds)
 
-        if avg_acc_all > self.optim['M2_acc']:
-            print("\033[1;31m" + "***M2***Best Model***SAVE***" + "\033[0m")
-            self.optim.update(
-                {'round': self.rounds, 'M2_acc': avg_acc_all, 'M2_params': self.global_params, 'M2_loss': avg_loss_all})
-            self.save_model(method='M2')
-
-        self.M2_test_writer.add_scalar('acc', avg_acc_all, global_step=self.rounds)
-        self.M2_test_writer.add_scalar('loss', avg_loss_all, global_step=self.rounds)
-
+        if avg_acc_all > self.optim['acc']:
+            print("\033[1;31m" + "***Best Model***SAVE***" + "\033[0m")
+            self.optim.update({'round': self.rounds, 'acc': avg_acc_all, 'global_feature_params': self.global_feature_params, 'loss': avg_loss_all})
+            # self.save_model()
         print("\n")
         print(
-            f"###### M1-Round: {self.optim['round']}, Optimal Federated Model, Average Accuracy Over All Clients(AAAC): "
-            f"\033[1;32m{self.optim['M1_acc']}\033[0m######")
-        print(
-            f"###### M2-Round: {self.optim['round']}, Optimal Federated Model, Average Accuracy Over All Clients(AAAC): "
-            f"\033[1;32m{self.optim['M2_acc']}\033[0m######")
+            f"######Round: {self.optim['round']}, Optimal Federated Model, Average Accuracy Over All Clients(AAAC): "
+            f"\033[1;32m{self.optim['acc']}\033[0m######")
 
-    def save_model(self, method='M1'):
-        path = f'/home/tdye/Fed101/result/fedsp/{self.dataset_name}_{self.model_name}_C{self.clients_per_round}_E{self.epoch}_B{self.flag}_lr{self.lr}_{self.note}'
+    def save_model(self):
+        path = f'/home/tdye/Fed101/result/fedsp/{self.dataset_name}_{self.model_name}_C{self.clients_per_round}_E{self.epoch}_B{self.batch_size}_lr{self.lr}_{self.note}'
         if not os.path.exists(path):
             os.makedirs(path)
-        path = f'{path}/model-{method}.pkl'
+        path = f'{path}/model.pkl'
         print(f"model saved to：{path}")
-        torch.save(self.global_params, path)
-
+        torch.save(self.global_feature_params, path)

@@ -10,13 +10,11 @@ if __name__ == '__main__':
     args = parse_args()
     dataset = args.dataset
     model_name = args.model
-    pretrain_model = args.pretrain_model
     epoch = args.epoch
     num_rounds = args.num_rounds
     eval_interval = args.eval_interval
     clients_per_round = args.clients_per_round
     batch_size = args.batch_size
-    mini_batch = args.mini_batch
     seed = args.seed
     lr = args.lr
     lr_decay = args.lr_decay
@@ -28,12 +26,10 @@ if __name__ == '__main__':
           f"dataset:\t\t\t{dataset}\n"
           f"clients:\t\t\t{clients_per_round}\n"
           f"model name:\t\t\t{model_name}\n"
-          f"pre-trained model:\t{pretrain_model}\n"
           f"epochs:\t\t\t\t{epoch}\n"
           f"num rounds:\t\t\t{num_rounds}\n"
           f"eval interval:\t\t{eval_interval}\n"
           f"batch size:\t\t\t{batch_size}\n"
-          f"mini batch:\t\t\t{mini_batch}\n"
           f"lr:\t\t\t\t\t{lr}\n"
           f"lr-decay:\t\t\t{lr_decay}\n"
           f"decay_step:\t\t\t{decay_step}\n"
@@ -41,7 +37,6 @@ if __name__ == '__main__':
 
     server = Server(rounds=num_rounds,
                     epoch=epoch,
-                    pretrain_model=pretrain_model,
                     clients_per_round=clients_per_round,
                     eval_interval=eval_interval,
                     seed=seed,
@@ -49,10 +44,8 @@ if __name__ == '__main__':
                     model_name=model_name,
                     lr=lr,
                     batch_size=batch_size,
-                    mini_batch=mini_batch,
                     lr_decay=lr_decay,
                     decay_step=decay_step,
                     note=note)
-    server.initiate()
     server.federate()
     server.print_optim()

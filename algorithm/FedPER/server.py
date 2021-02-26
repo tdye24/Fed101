@@ -6,7 +6,7 @@ import numpy as np
 
 from algorithm.BASE import BASE
 from tensorboardX import SummaryWriter
-from algorithm.FedAVG.client import Client
+from algorithm.FedPER.client import Client
 
 # dataloaders
 from data.mnist.MNIST_DATASET import get_mnist_dataloaders
@@ -33,13 +33,13 @@ class Server(BASE):
                  lr_decay=0.99,
                  decay_step=200,
                  note=''):
-        BASE.__init__(self, algorithm='fedavg', seed=seed, epoch=epoch, model_name=model_name,
+        BASE.__init__(self, algorithm='fedper', seed=seed, epoch=epoch, model_name=model_name,
                       lr=lr, batch_size=batch_size, lr_decay=lr_decay, decay_step=decay_step)
 
         self.model_name = model_name
         self.dataset_name = dataset_name
 
-        self.params = self.model.state_dict()
+        self.base_params = self.model.base.state_dict()
         self.updates = []
         self.selected_clients = []
         self.clients_per_round = clients_per_round
@@ -47,12 +47,12 @@ class Server(BASE):
         self.eval_interval = eval_interval
         self.note = note
 
-        self.optim = {'round': 0, 'acc': -1.0, 'params': None, 'loss': 10e8}
+        self.optim = {'round': 0, 'acc': -1.0, 'base_params': None, 'loss': 10e8}
 
         self.train_writer = SummaryWriter(
-            f'/home/tdye/Fed101/visualization/fedavg/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{batch_size}_lr{lr}_train_{note}')
+            f'/home/tdye/Fed101/visualization/fedper/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{batch_size}_lr{lr}_train_{note}')
         self.test_writer = SummaryWriter(
-            f'/home/tdye/Fed101/visualization/fedavg/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{batch_size}_lr{lr}_val_{note}')
+            f'/home/tdye/Fed101/visualization/fedper/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{batch_size}_lr{lr}_val_{note}')
 
         self.clients = self.setup_clients()
         assert self.clients_per_round <= len(self.clients)
@@ -150,7 +150,7 @@ class Server(BASE):
                 else:
                     new_params[k] += client_params[k] * w
         # update global model params
-        self.params = new_params
+        self.base_params = new_params
 
     @staticmethod
     def avg_metric(metric_list):
@@ -169,12 +169,12 @@ class Server(BASE):
         for i in range(self.rounds):
             self.select_clients(round_th=i)
 
-            for k in range(len(self.selected_clients)):
+            for k in range(self.clients_per_round):
                 surrogate = self.surrogates[k]
                 c = self.selected_clients[k]
                 # surrogate <-- c
                 surrogate.update(c)
-                surrogate.set_params(self.params)
+                surrogate.set_base_params(self.base_params)
                 num_train_samples, update, loss = surrogate.train(round_th=i)
                 # c <-- surrogate
                 c.update(surrogate)
@@ -204,7 +204,7 @@ class Server(BASE):
 
                 if avg_acc_all > self.optim['acc']:
                     print("\033[1;31m" + "***Best Model***SAVE***" + "\033[0m")
-                    self.optim.update({'round': i, 'acc': avg_acc_all, 'params': self.params, 'loss': avg_loss_all})
+                    self.optim.update({'round': i, 'acc': avg_acc_all, 'base_params': self.base_params, 'loss': avg_loss_all})
                     # self.save_model()
 
                 self.test_writer.add_scalar('acc', avg_acc_all, global_step=i)
@@ -215,7 +215,7 @@ class Server(BASE):
         surrogate = self.surrogates[0]
         for c in self.clients:
             surrogate.update(c)
-            surrogate.set_params(self.params)
+            surrogate.set_base_params(self.base_params)
             num_test_samples, acc, loss = surrogate.test(dataset=dataset)
             acc_list.append((num_test_samples, acc))
             loss_list.append((num_test_samples, loss))
@@ -223,7 +223,7 @@ class Server(BASE):
 
     def print_optim(self):
         for c in self.clients:
-            c.set_params(self.params)
+            c.set_base_params(self.base_params)
         print("Round {}".format(self.rounds), end=' ')
 
         acc_all, loss_all = self.test(dataset='train')
@@ -244,7 +244,7 @@ class Server(BASE):
 
         if avg_acc_all > self.optim['acc']:
             print("\033[1;31m" + "***Best Model***SAVE***" + "\033[0m")
-            self.optim.update({'round': self.rounds, 'acc': avg_acc_all, 'params': self.params, 'loss': avg_loss_all})
+            self.optim.update({'round': self.rounds, 'acc': avg_acc_all, 'base_params': self.base_params, 'loss': avg_loss_all})
             # self.save_model()
         print("\n")
         print(
@@ -252,9 +252,9 @@ class Server(BASE):
             f"\033[1;32m{self.optim['acc']}\033[0m######")
 
     def save_model(self):
-        path = f'/home/tdye/Fed101/result/fedavg/{self.dataset_name}_{self.model_name}_C{self.clients_per_round}_E{self.epoch}_B{self.batch_size}_lr{self.lr}_{self.note}'
+        path = f'/home/tdye/Fed101/result/fedper/{self.dataset_name}_{self.model_name}_C{self.clients_per_round}_E{self.epoch}_B{self.batch_size}_lr{self.lr}_{self.note}'
         if not os.path.exists(path):
             os.makedirs(path)
         path = f'{path}/model.pkl'
         print(f"model saved to：{path}")
-        torch.save(self.params, path)
+        torch.save(self.base_params, path)

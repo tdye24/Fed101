@@ -5,10 +5,10 @@ from algorithm.BASE import BASE
 
 
 class Client(BASE):
-    def __init__(self, user_id, trainloader, testloader, model_name: str, lr=3e-4, batch_size=10, mini_batch=-1, epoch=1,
+    def __init__(self, user_id, trainloader, testloader, model_name: str, lr=3e-4, epoch=1,
                  seed=123, lr_decay=0.99, decay_step=200):
-        BASE.__init__(self, algorithm='fedsp', seed=seed, epoch=epoch, model_name=model_name, lr=lr, lr_decay=lr_decay, decay_step=decay_step)
-        torch.manual_seed(seed)  # recurrence experiment
+        BASE.__init__(self, algorithm='fedper', seed=seed, epoch=epoch, model_name=model_name,
+                      lr=lr, lr_decay=lr_decay, decay_step=decay_step)
 
         self.user_id = user_id
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -37,7 +37,7 @@ class Client(BASE):
                 loss.backward()
                 optimizer.step()
                 batch_loss.append(loss.item())
-        num_train_samples, update = self.trainloader.sampler.num_samples, self.get_global_feature_params()
+        num_train_samples, update = self.trainloader.sampler.num_samples, self.get_base_params()
         return num_train_samples, update, sum(batch_loss) / len(batch_loss)
 
     def test(self, dataset='test'):
@@ -73,11 +73,11 @@ class Client(BASE):
     def set_params(self, model_params):
         self.model.load_state_dict(model_params)
 
-    def get_global_feature_params(self):
-        return self.model.cpu().global_feature.state_dict()
+    def get_base_params(self):
+        return self.model.cpu().base.state_dict()
 
-    def set_global_feature_params(self, global_feature_params):
-        self.model.global_feature.load_state_dict(global_feature_params)
+    def set_base_params(self, base_params):
+        self.model.base.load_state_dict(base_params)
 
     def update(self, client):
         self.model.load_state_dict(client.model.state_dict())
