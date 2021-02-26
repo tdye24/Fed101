@@ -1,7 +1,7 @@
 # Fed101
 # Fed101@XLab.DaSE.ECNU
 
-```sh
+```shell script
 cd Fed101/algorithm/FedAVG &
 python fedavg-main.py
 -dataset
@@ -28,6 +28,25 @@ femnist
 1
 --note
 run_1_seed_12
+```
+
+```shell script
+python fedavg-main.py 
+-dataset femnist 
+-model femnist 
+--lr 0.03 
+--lr-decay 0.99 
+--batch-size 10 
+--clients-per-round 10 
+--num-rounds 1000 
+--seed 24 
+--epoch 5 
+--eval-interval 1 
+--note run_2_seed_24
+```
+
+```shell script
+python fedavg-main.py -dataset femnist -model femnist --lr 0.03 --lr-decay 0.99 --batch-size 10 --clients-per-round 10 --num-rounds 1000 --seed 24 --epoch 5 --eval-interval 1 --note run_2_seed_24
 ```
 
 

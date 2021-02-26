@@ -1,4 +1,8 @@
+import os
 import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '../../')))
+
 from utils.args import parse_args
 from utils.model_utils import Logger
 from algorithm.FedSP.server import Server
