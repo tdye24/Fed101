@@ -1,13 +1,19 @@
 import torch
 
+# fedavg
 from models.fedavg.femnist.FEMNIST import FEMNIST as FedAVG_FEMNIST
+from models.fedavg.cifar10.CIFAR10 import CIFAR10 as FedAVG_CIFAR10
 from models.fedavg.mnist.MNIST import MNIST as FedAVG_MNIST
 
+# fedsp
 from models.fedsp.femnist.FEMNIST import FEMNIST as FedSP_FEMNIST
 
+# fedper
 from models.fedper.femnist.FEMNIST import FEMNIST as FedPER_FEMNIST
 
+# fedprox
 from models.fedprox.femnist.FEMNIST import FEMNIST as FedPROX_FEMNIST
+from models.fedprox.cifar10.CIFAR10 import CIFAR10 as FedPROX_CIFAR10
 
 
 class BASE:
@@ -38,6 +44,8 @@ class BASE:
         if algorithm == 'fedavg':
             if model_name == 'femnist':
                 model = FedAVG_FEMNIST()
+            elif model_name == 'cifar10':
+                model = FedAVG_CIFAR10()
             elif model_name == 'mnist':
                 model = FedAVG_MNIST()
         elif algorithm == 'fedsp':
@@ -49,4 +57,6 @@ class BASE:
         elif algorithm == 'fedprox':
             if model_name == 'femnist':
                 model = FedPROX_FEMNIST()
+            elif model_name == 'cifar10':
+                model = FedPROX_CIFAR10()
         return model
