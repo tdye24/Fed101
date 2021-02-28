@@ -26,6 +26,7 @@ class FEMNIST(nn.Module):
         self.fc = nn.Sequential(
             nn.Linear(64*7*7 + 16*7*7, 512),  # 乘2因为global_feat和local_feat拼在一起
             nn.ReLU(inplace=True),
+            nn.Dropout(p=0.5),
             nn.Linear(512, 62)
         )
 
