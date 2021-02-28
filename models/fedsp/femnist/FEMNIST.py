@@ -15,16 +15,16 @@ class FEMNIST(nn.Module):
         )
 
         self.local_feature = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=5, padding=2),
+            nn.Conv2d(in_channels=1, out_channels=8, kernel_size=5, padding=2),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2, 2),
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=5, padding=2),
+            nn.Conv2d(in_channels=8, out_channels=16, kernel_size=5, padding=2),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2, 2)
         )
         # 改成2048
         self.fc = nn.Sequential(
-            nn.Linear(64*7*7*2, 512),  # 乘2因为global_feat和local_feat拼在一起
+            nn.Linear(64*7*7 + 16*7*7, 512),  # 乘2因为global_feat和local_feat拼在一起
             nn.ReLU(inplace=True),
             nn.Linear(512, 62)
         )
