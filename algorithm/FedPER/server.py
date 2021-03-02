@@ -242,7 +242,7 @@ class Server(BASE):
                         {'round': i, 'ft-acc': avg_acc_all, 'base_params': self.base_params, 'ft-loss': avg_loss_all})
                     # self.save_model()
 
-                self.test_writer.add_scalar('ft--acc', avg_acc_all, global_step=i)
+                self.test_writer.add_scalar('ft-acc', avg_acc_all, global_step=i)
                 self.test_writer.add_scalar('ft-loss', avg_loss_all, global_step=i)
 
             # clear
