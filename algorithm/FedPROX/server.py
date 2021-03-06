@@ -87,9 +87,7 @@ class Server(BASE):
                                      std=[0.229, 0.224, 0.225])
             ])
             # TODO(specify the num of all clients: default 100 for cifar10 dataset)
-            users, trainloaders, testloaders = get_cifar10_dataloaders(batch_size=self.batch_size,
-                                                                       train_transform=train_transform,
-                                                                       test_transform=test_transform)
+            users, trainloaders, testloaders = get_cifar10_dataloaders(num_users=100, split_ratio=0.7, batch_size=self.batch_size)
 
         elif self.dataset_name == 'mnist':
             train_transform = None

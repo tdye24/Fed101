@@ -7,7 +7,6 @@ from utils.args import parse_args
 from utils.model_utils import Logger
 from algorithm.FedSP.server import Server
 
-
 if __name__ == '__main__':
     # sys.stdout = Logger()
 
@@ -52,4 +51,4 @@ if __name__ == '__main__':
                     decay_step=decay_step,
                     note=note)
     server.federate()
-    server.print_optim()
+    # server.print_optim()

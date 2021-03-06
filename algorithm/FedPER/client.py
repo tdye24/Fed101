@@ -37,7 +37,7 @@ class Client(BASE):
                 loss.backward()
                 optimizer.step()
                 batch_loss.append(loss.item())
-        num_train_samples, update = self.trainloader.sampler.num_samples, self.get_base_params()
+        num_train_samples, update = self.trainloader.sampler.num_samples, self.get_params()
         return num_train_samples, update, sum(batch_loss) / len(batch_loss)
 
     def test(self, dataset='test'):

@@ -40,6 +40,7 @@ class Server(BASE):
         self.dataset_name = dataset_name
 
         self.base_params = self.model.base.state_dict()
+        self.params = self.model.state_dict()
         self.updates = []
         self.selected_clients = []
         self.clients_per_round = clients_per_round
@@ -47,7 +48,7 @@ class Server(BASE):
         self.eval_interval = eval_interval
         self.note = note
 
-        self.optim = {'round': 0, 'acc': -1.0, 'ft-acc': -1.0, 'base_params': None, 'loss': 10e8, 'ft-loss': 10e8}
+        self.optim = {'round': 0, 'acc': -1.0, 'ft-acc': -1.0, 'base_params': None, 'params': None, 'loss': 10e8, 'ft-loss': 10e8}
 
         self.train_writer = SummaryWriter(
             f'/home/tdye/Fed101/visualization/fedper/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{batch_size}_lr{lr}_train_{note}')
@@ -75,21 +76,19 @@ class Server(BASE):
             #     transforms.Normalize(mean=[0.485, 0.456, 0.406],
             #                          std=[0.229, 0.224, 0.225])
             # ])
-            train_transform = transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-            ])
-
-            test_transform = transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-            ])
-            # TODO(specify the num of all clients: default 100 for cifar10 dataset)
-            users, trainloaders, testloaders = get_cifar10_dataloaders(batch_size=self.batch_size,
-                                                                       train_transform=train_transform,
-                                                                       test_transform=test_transform)
+            # train_transform = transforms.Compose([
+            #     transforms.ToTensor(),
+            #     transforms.Normalize(mean=[0.485, 0.456, 0.406],
+            #                          std=[0.229, 0.224, 0.225])
+            # ])
+            #
+            # test_transform = transforms.Compose([
+            #     transforms.ToTensor(),
+            #     transforms.Normalize(mean=[0.485, 0.456, 0.406],
+            #                          std=[0.229, 0.224, 0.225])
+            # ])
+            # TODO(specify the num of all clients: default 10 for cifar10 dataset)
+            users, trainloaders, testloaders = get_cifar10_dataloaders(num_users=100, split_ratio=0.7, batch_size=10)
 
         elif self.dataset_name == 'mnist':
             train_transform = None
@@ -150,7 +149,11 @@ class Server(BASE):
                 else:
                     new_params[k] += client_params[k] * w
         # update global model params
-        self.base_params = new_params
+        self.params = new_params
+
+        # 在base_params中key为'0.weight'，在new_params中key为'base.0.weight'
+        for key in list(self.base_params.keys()):
+            self.base_params[key] = new_params['base.' + key]
 
     @staticmethod
     def avg_metric(metric_list):
@@ -209,7 +212,6 @@ class Server(BASE):
                 self.test_writer.add_scalar('loss', avg_loss_all, global_step=i)
 
             # FineTuning
-            print("FineTuning")
             surrogate = self.surrogates[0]
             for c in self.selected_clients:
                 surrogate.update(c)
@@ -222,7 +224,7 @@ class Server(BASE):
                     param[1].requires_grad = True
             # FineTune 后 Testing
             if i % self.eval_interval == 0:
-                print("--------------------------\n")
+                print("--------FineTuning--------\n")
                 print("Round {}".format(i))
                 # test on training data
                 acc_over_all, loss_over_all = self.test(dataset='train')
@@ -230,7 +232,7 @@ class Server(BASE):
                 print("FT #TRAIN# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
 
                 self.train_writer.add_scalar('ft-acc', avg_acc_all, global_step=i)
-                self.train_writer.add_scalar('tf-loss', avg_loss_all, global_step=i)
+                self.train_writer.add_scalar('ft-loss', avg_loss_all, global_step=i)
                 # test on testing data
                 acc_over_all, loss_over_all = self.test(dataset='test')
                 avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)

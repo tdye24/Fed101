@@ -12,6 +12,8 @@ from algorithm.FedSP.client import Client
 from data.mnist.MNIST_DATASET import get_mnist_dataloaders
 from data.cifar10.CIFAR10_DATASET import get_cifar10_dataloaders
 from data.femnist.FEMNIST_DATASET import get_femnist_dataloaders
+from data.flickr.FLICKR_DATASET import get_flickr_dataloaders
+from data.celeba.CELEBA_DATASET import get_celeba_dataloaders
 
 from torch.backends import cudnn
 
@@ -47,7 +49,7 @@ class Server(BASE):
         self.eval_interval = eval_interval
         self.note = note
 
-        self.optim = {'round': 0, 'acc': -1.0, 'global_feature_params': None, 'loss': 10e8}  # 第几轮，准确率，最高准确率对应的参数
+        self.optim = {'round': 0, 'acc': -1.0, 'ft-acc': -1.0, 'ft-loss': 1e8, 'global_feature_params': None, 'loss': 10e8}  # 第几轮，准确率，最高准确率对应的参数
 
         self.train_writer = SummaryWriter(
             f'/home/tdye/Fed101/visualization/fedsp/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{batch_size}_lr{lr}_train_{note}')
@@ -59,6 +61,8 @@ class Server(BASE):
 
         self.surrogates = self.setup_surrogates()
         assert len(self.surrogates) == clients_per_round
+
+        self.have_seen_clients = set()
 
     def setup_clients(self):
         users = []
@@ -75,21 +79,19 @@ class Server(BASE):
             #     transforms.Normalize(mean=[0.485, 0.456, 0.406],
             #                          std=[0.229, 0.224, 0.225])
             # ])
-            train_transform = transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-            ])
-
-            test_transform = transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-            ])
+            # train_transform = transforms.Compose([
+            #     transforms.ToTensor(),
+            #     transforms.Normalize(mean=[0.485, 0.456, 0.406],
+            #                          std=[0.229, 0.224, 0.225])
+            # ])
+            #
+            # test_transform = transforms.Compose([
+            #     transforms.ToTensor(),
+            #     transforms.Normalize(mean=[0.485, 0.456, 0.406],
+            #                          std=[0.229, 0.224, 0.225])
+            # ])
             # TODO(specify the num of all clients: default 100 for cifar10 dataset)
-            users, trainloaders, testloaders = get_cifar10_dataloaders(batch_size=self.batch_size,
-                                                                       train_transform=train_transform,
-                                                                       test_transform=test_transform)
+            users, trainloaders, testloaders = get_cifar10_dataloaders(num_users=100, split_ratio=0.7, batch_size=self.batch_size)
 
         elif self.dataset_name == 'mnist':
             train_transform = None
@@ -99,7 +101,10 @@ class Server(BASE):
                                                                      test_transform=test_transform)
         elif self.dataset_name == 'femnist':
             users, trainloaders, testloaders = get_femnist_dataloaders(batch_size=self.batch_size)
-
+        elif self.dataset_name == 'flickr':
+            users, trainloaders, testloaders = get_flickr_dataloaders(split_ratio=0.9, batch_size=10)
+        elif self.dataset_name == 'celeba':
+            users, trainloaders, testloaders = get_celeba_dataloaders(batch_size=self.batch_size)
         clients = [
             Client(user_id=user_id,
                    seed=self.seed,
@@ -169,6 +174,11 @@ class Server(BASE):
         for i in range(self.rounds):
             self.select_clients(round_th=i)
 
+            for c in self.selected_clients:
+                self.have_seen_clients.add(c.user_id)
+
+            print(f"Have Seen {len(self.have_seen_clients) / len(self.clients)}")
+
             for k in range(len(self.selected_clients)):
                 surrogate = self.surrogates[k]
                 c = self.selected_clients[k]
@@ -182,10 +192,6 @@ class Server(BASE):
 
             # average
             self.average()
-
-            # clear
-            self.updates = []
-            self.selected_clients = []
 
             if i % self.eval_interval == 0:
                 print("--------------------------\n")
@@ -210,15 +216,56 @@ class Server(BASE):
                 self.test_writer.add_scalar('acc', avg_acc_all, global_step=i)
                 self.test_writer.add_scalar('loss', avg_loss_all, global_step=i)
 
+            # FineTuning
+            # surrogate = self.surrogates[0]
+            # for c in self.selected_clients:
+            #     surrogate.update(c)
+            #     surrogate.set_global_feature_params(self.global_feature_params)
+            #     for _, param in enumerate(surrogate.model.global_feature.named_parameters()):
+            #         param[1].requires_grad = False
+            #     num_train_samples, update, loss = surrogate.train(round_th=i)
+            #     c.update(surrogate)
+            #     for _, param in enumerate(surrogate.model.global_feature.named_parameters()):
+            #         param[1].requires_grad = True
+            # FineTune 后 Testing
+            # if i % self.eval_interval == 0:
+            #     print("--------FineTuning--------\n")
+            #     print("Round {}".format(i))
+            #     # test on training data
+            #     acc_over_all, loss_over_all = self.test(dataset='train')
+            #     avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
+            #     print("FT #TRAIN# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
+            #
+            #     self.train_writer.add_scalar('ft-acc', avg_acc_all, global_step=i)
+            #     self.train_writer.add_scalar('ft-loss', avg_loss_all, global_step=i)
+            #     # test on testing data
+            #     acc_over_all, loss_over_all = self.test(dataset='test')
+            #     avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
+            #     print("FT #TEST# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
+            #
+            #     if avg_acc_all > self.optim['ft-acc']:
+            #         print("\033[1;31m" + "***Best Model***SAVE***" + "\033[0m")
+            #         self.optim.update(
+            #             {'round': i, 'ft-acc': avg_acc_all, 'global_feature_params': self.global_feature_params, 'ft-loss': avg_loss_all})
+            #         # self.save_model()
+            #
+            #     self.test_writer.add_scalar('ft-acc', avg_acc_all, global_step=i)
+            #     self.test_writer.add_scalar('ft-loss', avg_loss_all, global_step=i)
+
+            # clear
+            self.updates = []
+            self.selected_clients = []
+
     def test(self, dataset='test'):
         acc_list, loss_list = [], []
         surrogate = self.surrogates[0]
         for c in self.clients:
-            surrogate.update(c)
-            surrogate.set_global_feature_params(self.global_feature_params)
-            num_test_samples, acc, loss = surrogate.test(dataset=dataset)
-            acc_list.append((num_test_samples, acc))
-            loss_list.append((num_test_samples, loss))
+            if c.user_id in self.have_seen_clients:
+                surrogate.update(c)
+                surrogate.set_global_feature_params(self.global_feature_params)
+                num_test_samples, acc, loss = surrogate.test(dataset=dataset)
+                acc_list.append((num_test_samples, acc))
+                loss_list.append((num_test_samples, loss))
         return acc_list, loss_list
 
     def print_optim(self):

@@ -32,13 +32,13 @@ class Client(BASE):
                 data = data.to(self.device)
                 labels = labels.to(self.device)
                 optimizer.zero_grad()
-                output = model(data)
+                output, avg_gate_output = model(data)
                 loss = criterion(output, labels)
                 loss.backward()
                 optimizer.step()
                 batch_loss.append(loss.item())
-        num_train_samples, update = self.trainloader.sampler.num_samples, self.get_global_feature_params()
-        return num_train_samples, update, sum(batch_loss) / len(batch_loss)
+        num_train_samples, global_feature_update, fc_update = self.trainloader.sampler.num_samples, self.get_global_feature_params(), self.get_fc_params()
+        return num_train_samples, global_feature_update, fc_update, sum(batch_loss) / len(batch_loss)
 
     def test(self, dataset='test'):
         model = self.model
@@ -55,17 +55,27 @@ class Client(BASE):
         total_right = 0
         total_samples = 0
         with torch.no_grad():
+            gate_global = []
+            gate_local = []
+
             for step, (data, labels) in enumerate(dataloader):
                 data = data.to(self.device)
                 labels = labels.to(self.device)
-                output = model(data)
+                output, avg_gate_output = model(data)
                 loss = criterion(output, labels)
                 output = torch.argmax(output, dim=-1)
                 total_right += torch.sum(output == labels)
                 total_samples += len(labels)
-            acc = float(total_right) / total_samples
 
-        return total_samples, acc, loss.item()
+                avg_gate_output = avg_gate_output.cpu().numpy()
+                gate_global.append(avg_gate_output[0])
+                gate_local.append(avg_gate_output[1])
+
+            acc = float(total_right) / total_samples
+            avg_gate_global = sum(gate_global) / len(gate_global)
+            avg_gate_local = sum(gate_local) / len(gate_local)
+
+        return total_samples, acc, loss.item(), avg_gate_global, avg_gate_local
 
     def get_params(self):
         return self.model.cpu().state_dict()
@@ -78,6 +88,12 @@ class Client(BASE):
 
     def set_global_feature_params(self, global_feature_params):
         self.model.global_feature.load_state_dict(global_feature_params)
+
+    def get_fc_params(self):
+        return self.model.cpu().fc.state_dict()
+
+    def set_fc_params(self, fc_params):
+        self.model.fc.load_state_dict(fc_params)
 
     def update(self, client):
         self.model.load_state_dict(client.model.state_dict())

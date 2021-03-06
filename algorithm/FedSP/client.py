@@ -23,7 +23,7 @@ class Client(BASE):
         model.to(self.device)
         model.train()
 
-        criterion = torch.nn.CrossEntropyLoss().to(self.device)
+        criterion = torch.nn.CrossEntropyLoss()
         optimizer = optim.SGD(params=model.parameters(),
                               lr=self.lr * self.lr_decay ** (round_th / self.decay_step),
                               weight_decay=1e-3)
@@ -47,7 +47,7 @@ class Client(BASE):
         model.eval()
         model.to(self.device)
 
-        criterion = torch.nn.CrossEntropyLoss().to(self.device)
+        criterion = torch.nn.CrossEntropyLoss()
 
         if dataset == 'test':
             dataloader = self.testloader

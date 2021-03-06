@@ -1,3 +1,3 @@
-echo "nohup python fedsp-main.py -dataset ${1} -model ${2} --lr ${3} --lr-decay ${4} --batch-size ${5} --clients-per-round ${6} --num-rounds ${7} --seed ${8} --epoch ${9} --eval-interval ${10} --note ${11} > ${1}_${2}_C${6}_E${9}_B${5}_lr${3}_${11}.txt 2>&1 &"
-nohup python fedsp-main.py -dataset ${1} -model ${2} --lr ${3} --lr-decay ${4} --batch-size ${5} --clients-per-round ${6} --num-rounds ${7} --seed ${8} --epoch ${9} --eval-interval ${10} --note ${11} > ${1}_${2}_C${6}_E${9}_B${5}_lr${3}_${11}.txt 2>&1 &
+echo "nohup python fedsp-main.py -dataset ${1} -model ${2} --lr ${3} --lr-decay ${4} --decay-step ${5} --batch-size ${6} --clients-per-round ${7} --num-rounds ${8} --seed ${9} --epoch ${10} --eval-interval ${11} --note ${12} > ${1}_${2}_C${7}_E${10}_B${6}_lr${3}_${12}.txt 2>&1 &"
+nohup python fedsp-main.py -dataset ${1} -model ${2} --lr ${3} --lr-decay ${4} --decay-step ${5} --batch-size ${6} --clients-per-round ${7} --num-rounds ${8} --seed ${9} --epoch ${10} --eval-interval ${11} --note ${12} > ${1}_${2}_C${7}_E${10}_B${6}_lr${3}_${12}.txt 2>&1 &
 
