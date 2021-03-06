@@ -15,16 +15,16 @@ class CIFAR10(nn.Module):
         )
 
         self.local_feature = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=3, out_channels=32, kernel_size=5),
+            torch.nn.Conv2d(in_channels=3, out_channels=8, kernel_size=5),
             torch.nn.ReLU(inplace=True),
             torch.nn.MaxPool2d(2, 2),
-            torch.nn.Conv2d(32, 64, kernel_size=5),
+            torch.nn.Conv2d(8, 16, kernel_size=5),
             torch.nn.ReLU(inplace=True),
             torch.nn.MaxPool2d(2, 2)
         )
 
         self.fc = torch.nn.Sequential(
-            torch.nn.Linear(64*5*5*2, 1024),  # 乘2因为global_feat和local_feat拼在一起
+            torch.nn.Linear(64*5*5 + 16*5*5, 1024),  # 乘2因为global_feat和local_feat拼在一起
             torch.nn.ReLU(inplace=True),
             nn.Dropout(p=0.5),
             torch.nn.Linear(1024, 256),
