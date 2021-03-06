@@ -3,3 +3,5 @@ __pycache__
 data
 visualization
 result
+algorithm/*/*.txt
+warehouse
