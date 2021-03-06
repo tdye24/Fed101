@@ -1,6 +1,6 @@
 import argparse
 
-DATASETS = ['femnist', 'cifar10', 'cifar100', 'synthetic_iid', 'mnist', 'mnist-prox', 'ml100k', 'femnist-fedml']
+DATASETS = ['femnist', 'cifar10', 'cifar100', 'synthetic_iid', 'mnist', 'mnist-prox', 'ml100k', 'femnist-fedml', 'flickr', 'celeba']
 
 
 def parse_args():
