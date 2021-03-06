@@ -14,9 +14,9 @@ class FEMNIST(nn.Module):
         )
 
         self.fc = nn.Sequential(
-            nn.Linear(64*7*7, 512),
+            nn.Linear(64*7*7, 2048),
             nn.ReLU(inplace=True),
-            nn.Linear(512, 62)
+            nn.Linear(2048, 62)
         )
 
     def forward(self, x):
