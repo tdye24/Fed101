@@ -3,6 +3,7 @@ import copy
 import torch
 from torchvision import transforms
 import numpy as np
+from utils.model_utils import read_data
 
 from algorithm.BASE import BASE
 from tensorboardX import SummaryWriter
@@ -100,7 +101,9 @@ class Server(BASE):
                                                                      train_transform=train_transform,
                                                                      test_transform=test_transform)
         elif self.dataset_name == 'femnist':
-            users, trainloaders, testloaders = get_femnist_dataloaders(batch_size=self.batch_size)
+            train_data_dir = os.path.join('..', '..', 'data', 'femnist', 'data', 'train')
+            test_data_dir = os.path.join('..', '..', 'data', 'femnist', 'data', 'test')
+            users, trainloaders, testloaders = read_data(train_data_dir, test_data_dir)
         elif self.dataset_name == 'flickr':
             users, trainloaders, testloaders = get_flickr_dataloaders(split_ratio=0.9, batch_size=10)
         elif self.dataset_name == 'celeba':

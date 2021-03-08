@@ -30,11 +30,14 @@ class FEMNIST(nn.Module):
         )
 
     def forward(self, x):
+        x = x.reshape((-1, 1, 28, 28))
         global_feat = self.global_feature(x)
+        global_feat_flatten = global_feat.flatten(start_dim=1)
         local_feat = self.local_feature(x)
-        feature = torch.cat((global_feat, local_feat), dim=1)
-        feature_flatten = feature.flatten(start_dim=1)
-        output = self.fc(feature_flatten)
+        local_feat_flatten = local_feat.flatten(start_dim=1)
+        feature = torch.cat((global_feat_flatten, local_feat_flatten), dim=1)
+        # feature_flatten = feature.flatten(start_dim=1)
+        output = self.fc(feature)
         return output
 
 

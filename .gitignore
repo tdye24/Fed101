@@ -5,3 +5,8 @@ visualization
 result
 algorithm/*/*.txt
 warehouse
+algorithm/FedSP
+algorithm/FedMoE
+models/fedsp
+models/fedmoe
+models/fedmc
