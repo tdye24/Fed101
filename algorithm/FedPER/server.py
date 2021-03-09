@@ -39,7 +39,6 @@ class Server(BASE):
         self.model_name = model_name
         self.dataset_name = dataset_name
 
-        self.base_params = self.model.base.state_dict()
         self.params = self.model.state_dict()
         self.updates = []
         self.selected_clients = []
@@ -48,7 +47,7 @@ class Server(BASE):
         self.eval_interval = eval_interval
         self.note = note
 
-        self.optim = {'round': 0, 'acc': -1.0, 'ft-acc': -1.0, 'base_params': None, 'params': None, 'loss': 10e8, 'ft-loss': 10e8}
+        self.optim = {'round': 0, 'acc': -1.0, 'params': None, 'loss': 10e8}
 
         self.train_writer = SummaryWriter(
             f'/home/tdye/Fed101/visualization/fedper/{dataset_name}_{model_name}_C{clients_per_round}_E{epoch}_B{batch_size}_lr{lr}_train_{note}')
@@ -151,10 +150,6 @@ class Server(BASE):
         # update global model params
         self.params = new_params
 
-        # 在base_params中key为'0.weight'，在new_params中key为'base.0.weight'
-        for key in list(self.base_params.keys()):
-            self.base_params[key] = new_params['base.' + key]
-
     @staticmethod
     def avg_metric(metric_list):
         total_weight = 0
@@ -170,6 +165,8 @@ class Server(BASE):
         print("Begin Federating!")
         print(f"Training {len(self.clients)} clients!")
         for i in range(self.rounds):
+            print("----------------------")
+            print("Round {}".format(i))
             self.select_clients(round_th=i)
 
             for k in range(self.clients_per_round):
@@ -177,7 +174,7 @@ class Server(BASE):
                 c = self.selected_clients[k]
                 # surrogate <-- c
                 surrogate.update(c)
-                surrogate.set_base_params(self.base_params)
+                surrogate.set_shared_params(self.params)
                 num_train_samples, update, loss = surrogate.train(round_th=i)
                 # c <-- surrogate
                 c.update(surrogate)
@@ -188,8 +185,6 @@ class Server(BASE):
 
             # FineTuning 前 Testing
             if i % self.eval_interval == 0:
-                print("--------------------------\n")
-                print("Round {}".format(i))
                 # test on training data
                 acc_over_all, loss_over_all = self.test(dataset='train')
                 avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
@@ -205,49 +200,48 @@ class Server(BASE):
                 if avg_acc_all > self.optim['acc']:
                     print("\033[1;31m" + "***Best Model***SAVE***" + "\033[0m")
                     self.optim.update(
-                        {'round': i, 'acc': avg_acc_all, 'base_params': self.base_params, 'loss': avg_loss_all})
+                        {'round': i, 'acc': avg_acc_all, 'params': self.params, 'loss': avg_loss_all})
                     # self.save_model()
 
                 self.test_writer.add_scalar('acc', avg_acc_all, global_step=i)
                 self.test_writer.add_scalar('loss', avg_loss_all, global_step=i)
 
             # FineTuning
-            surrogate = self.surrogates[0]
-            for c in self.selected_clients:
-                surrogate.update(c)
-                surrogate.set_base_params(self.base_params)
-                for _, param in enumerate(surrogate.model.base.named_parameters()):
-                    param[1].requires_grad = False
-                num_train_samples, update, loss = surrogate.train(round_th=i)
-                c.update(surrogate)
-                for _, param in enumerate(surrogate.model.base.named_parameters()):
-                    param[1].requires_grad = True
+            # surrogate = self.surrogates[0]
+            # for c in self.selected_clients:
+            #     surrogate.update(c)
+            #     surrogate.set_base_params(self.base_params)
+            #     for _, param in enumerate(surrogate.model.base.named_parameters()):
+            #         param[1].requires_grad = False
+            #     num_train_samples, update, loss = surrogate.train(round_th=i)
+            #     c.update(surrogate)
+            #     for _, param in enumerate(surrogate.model.base.named_parameters()):
+            #         param[1].requires_grad = True
             # FineTune 后 Testing
-            if i % self.eval_interval == 0:
-                print("--------FineTuning--------\n")
-                print("Round {}".format(i))
-                # test on training data
-                acc_over_all, loss_over_all = self.test(dataset='train')
-                avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
-                print("FT #TRAIN# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
-
-                self.train_writer.add_scalar('ft-acc', avg_acc_all, global_step=i)
-                self.train_writer.add_scalar('ft-loss', avg_loss_all, global_step=i)
-                # test on testing data
-                acc_over_all, loss_over_all = self.test(dataset='test')
-                avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
-                print("FT #TEST# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
-
-                if avg_acc_all > self.optim['ft-acc']:
-                    print("\033[1;31m" + "***Best Model***SAVE***" + "\033[0m")
-                    self.optim.update(
-                        {'round': i, 'ft-acc': avg_acc_all, 'base_params': self.base_params, 'ft-loss': avg_loss_all})
-                    # self.save_model()
-
-                self.test_writer.add_scalar('ft-acc', avg_acc_all, global_step=i)
-                self.test_writer.add_scalar('ft-loss', avg_loss_all, global_step=i)
+            # if i % self.eval_interval == 0:
+            #     # test on training data
+            #     acc_over_all, loss_over_all = self.test(dataset='train')
+            #     avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
+            #     print("FT #TRAIN# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
+            #
+            #     self.train_writer.add_scalar('ft-acc', avg_acc_all, global_step=i)
+            #     self.train_writer.add_scalar('ft-loss', avg_loss_all, global_step=i)
+            #     # test on testing data
+            #     acc_over_all, loss_over_all = self.test(dataset='test')
+            #     avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
+            #     print("FT #TEST# Avg acc: {:.4f}%, Avg loss: {:.4f}".format(avg_acc_all * 100, avg_loss_all))
+            #
+            #     if avg_acc_all > self.optim['ft-acc']:
+            #         print("\033[1;31m" + "***Best Model***SAVE***" + "\033[0m")
+            #         self.optim.update(
+            #             {'round': i, 'ft-acc': avg_acc_all, 'base_params': self.base_params, 'ft-loss': avg_loss_all})
+            #         # self.save_model()
+            #
+            #     self.test_writer.add_scalar('ft-acc', avg_acc_all, global_step=i)
+            #     self.test_writer.add_scalar('ft-loss', avg_loss_all, global_step=i)
 
             # clear
+
             self.updates = []
             self.selected_clients = []
 
@@ -256,7 +250,7 @@ class Server(BASE):
         surrogate = self.surrogates[0]
         for c in self.clients:
             surrogate.update(c)
-            surrogate.set_base_params(self.base_params)
+            surrogate.set_shared_params(self.params)
             num_test_samples, acc, loss = surrogate.test(dataset=dataset)
             acc_list.append((num_test_samples, acc))
             loss_list.append((num_test_samples, loss))
@@ -264,7 +258,7 @@ class Server(BASE):
 
     def print_optim(self):
         for c in self.clients:
-            c.set_base_params(self.base_params)
+            c.set_shared_params(self.params)
         print("Round {}".format(self.rounds), end=' ')
 
         acc_all, loss_all = self.test(dataset='train')
@@ -286,7 +280,7 @@ class Server(BASE):
         if avg_acc_all > self.optim['acc']:
             print("\033[1;31m" + "***Best Model***SAVE***" + "\033[0m")
             self.optim.update(
-                {'round': self.rounds, 'acc': avg_acc_all, 'base_params': self.base_params, 'loss': avg_loss_all})
+                {'round': self.rounds, 'acc': avg_acc_all, 'params': self.params, 'loss': avg_loss_all})
             # self.save_model()
         print("\n")
         print(
@@ -299,4 +293,4 @@ class Server(BASE):
             os.makedirs(path)
         path = f'{path}/model.pkl'
         print(f"model saved to：{path}")
-        torch.save(self.base_params, path)
+        torch.save(self.params, path)
