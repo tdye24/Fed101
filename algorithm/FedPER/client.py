@@ -73,11 +73,15 @@ class Client(BASE):
     def set_params(self, model_params):
         self.model.load_state_dict(model_params)
 
-    def get_base_params(self):
+    def get_shared_params(self):
         return self.model.cpu().base.state_dict()
 
-    def set_base_params(self, base_params):
-        self.model.base.load_state_dict(base_params)
+    def set_shared_params(self, params):
+        tmp_params = self.get_params()
+        for (key, value) in params.items():
+            if key.startswith('shared'):
+                tmp_params[key] = value
+        self.set_params(tmp_params)
 
     def update(self, client):
         self.model.load_state_dict(client.model.state_dict())
