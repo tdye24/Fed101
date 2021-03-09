@@ -5,7 +5,7 @@ import torch.nn as nn
 class FEMNIST(nn.Module):
     def __init__(self):
         super(FEMNIST, self).__init__()
-        self.base = nn.Sequential(
+        self.shared_base = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=32, kernel_size=5, padding=2),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2, 2),
@@ -14,16 +14,21 @@ class FEMNIST(nn.Module):
             nn.MaxPool2d(2, 2)
         )
 
-        self.personalization = nn.Sequential(
+        self.private_personalization = nn.Sequential(
             nn.Linear(64*7*7, 512),
             nn.ReLU(inplace=True),
             nn.Linear(512, 62)
         )
 
+        # self.shared_fc = nn.Sequential(
+        #     nn.Linear(512, 62)
+        # )
+
     def forward(self, x):
-        base_output = self.base(x)
-        base_output = base_output.flatten(start_dim=1)
-        output = self.personalization(base_output)
+        base_output = self.shared_base(x)
+        base_output_flatten = base_output.flatten(start_dim=1)
+        output = self.private_personalization(base_output_flatten)
+        # output = self.shared_fc(per_output)
         return output
 
 
