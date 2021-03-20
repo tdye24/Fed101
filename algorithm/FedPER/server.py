@@ -33,12 +33,8 @@ class Server(BASE):
                  lr_decay=0.99,
                  decay_step=200,
                  note=''):
-        BASE.__init__(self, algorithm='fedper', seed=seed, epoch=epoch, model_name=model_name,
+        BASE.__init__(self, algorithm='fedper', seed=seed, epoch=epoch, model_name=model_name, dataset_name=dataset_name,
                       lr=lr, batch_size=batch_size, lr_decay=lr_decay, decay_step=decay_step)
-
-        self.model_name = model_name
-        self.dataset_name = dataset_name
-
         self.params = self.model.state_dict()
         self.updates = []
         self.selected_clients = []
@@ -61,43 +57,8 @@ class Server(BASE):
         assert len(self.surrogates) == clients_per_round
 
     def setup_clients(self):
-        users = []
-        trainloaders, testloaders = [], []
-        if self.dataset_name == 'cifar10':
-            # data augmentation
-            # train_transform = transforms.Compose([
-            #     # transforms.RandomCrop(size=24, padding=8, fill=0, padding_mode='constant'),
-            #     transforms.RandomHorizontalFlip(p=0.5),
-            #     transforms.RandomApply([
-            #         transforms.ColorJitter(brightness=0.8, contrast=0.8, saturation=0.8, hue=0.2)], p=0.8),
-            #
-            #     transforms.ToTensor(),
-            #     transforms.Normalize(mean=[0.485, 0.456, 0.406],
-            #                          std=[0.229, 0.224, 0.225])
-            # ])
-            # train_transform = transforms.Compose([
-            #     transforms.ToTensor(),
-            #     transforms.Normalize(mean=[0.485, 0.456, 0.406],
-            #                          std=[0.229, 0.224, 0.225])
-            # ])
-            #
-            # test_transform = transforms.Compose([
-            #     transforms.ToTensor(),
-            #     transforms.Normalize(mean=[0.485, 0.456, 0.406],
-            #                          std=[0.229, 0.224, 0.225])
-            # ])
-            # TODO(specify the num of all clients: default 10 for cifar10 dataset)
-            users, trainloaders, testloaders = get_cifar10_dataloaders(num_users=100, split_ratio=0.7, batch_size=10)
-
-        elif self.dataset_name == 'mnist':
-            train_transform = None
-            test_transform = None
-            users, trainloaders, testloaders = get_mnist_dataloaders(batch_size=self.batch_size,
-                                                                     train_transform=train_transform,
-                                                                     test_transform=test_transform)
-        elif self.dataset_name == 'femnist':
-            users, trainloaders, testloaders = get_femnist_dataloaders(batch_size=self.batch_size)
-
+        users, trainloaders, testloaders = self.setup_datasets()
+        
         clients = [
             Client(user_id=user_id,
                    seed=self.seed,

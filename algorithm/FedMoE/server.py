@@ -33,12 +33,8 @@ class Server(BASE):
                  lr_decay=0.99,
                  decay_step=200,
                  note=''):
-        BASE.__init__(self, algorithm='fedmoe', seed=seed, epoch=epoch, model_name=model_name, lr=lr, batch_size=batch_size,
+        BASE.__init__(self, algorithm='fedmoe', seed=seed, epoch=epoch, model_name=model_name, dataset_name=dataset_name, lr=lr, batch_size=batch_size,
                       lr_decay=lr_decay, decay_step=decay_step)
-
-        self.model_name = model_name
-        self.dataset_name = dataset_name
-
         self.global_feature_params = self.model.global_feature.state_dict()
         # self.fc_params = self.model.fc.state_dict()
         self.global_feature_updates = []
@@ -63,42 +59,7 @@ class Server(BASE):
         assert len(self.surrogates) == clients_per_round
 
     def setup_clients(self):
-        users = []
-        trainloaders, testloaders = [], []
-        if self.dataset_name == 'cifar10':
-            # data augmentation
-            # train_transform = transforms.Compose([
-            #     # transforms.RandomCrop(size=24, padding=8, fill=0, padding_mode='constant'),
-            #     transforms.RandomHorizontalFlip(p=0.5),
-            #     transforms.RandomApply([
-            #         transforms.ColorJitter(brightness=0.8, contrast=0.8, saturation=0.8, hue=0.2)], p=0.8),
-            #
-            #     transforms.ToTensor(),
-            #     transforms.Normalize(mean=[0.485, 0.456, 0.406],
-            #                          std=[0.229, 0.224, 0.225])
-            # ])
-            train_transform = transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-            ])
-
-            test_transform = transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-            ])
-            # TODO(specify the num of all clients: default 100 for cifar10 dataset)
-            users, trainloaders, testloaders = get_cifar10_dataloaders(num_users=100, split_ratio=0.7, batch_size=10)
-
-        elif self.dataset_name == 'mnist':
-            train_transform = None
-            test_transform = None
-            users, trainloaders, testloaders = get_mnist_dataloaders(batch_size=self.batch_size,
-                                                                     train_transform=train_transform,
-                                                                     test_transform=test_transform)
-        elif self.dataset_name == 'femnist':
-            users, trainloaders, testloaders = get_femnist_dataloaders(batch_size=self.batch_size)
+        users, trainloaders, testloaders = self.setup_datasets()
 
         clients = [
             Client(user_id=user_id,
@@ -186,6 +147,9 @@ class Server(BASE):
         print("Begin Federating!")
         print(f"Training {len(self.clients)} clients!")
         for i in range(self.rounds):
+            print("--------------------------")
+            print("Round {}".format(i))
+
             self.select_clients(round_th=i)
 
             for k in range(len(self.selected_clients)):
@@ -210,8 +174,6 @@ class Server(BASE):
             self.selected_clients = []
 
             if i % self.eval_interval == 0:
-                print("--------------------------\n")
-                print("Round {}".format(i))
                 # test on training data
                 acc_over_all, loss_over_all, gate_global_over_all, gate_local_over_all = self.test(dataset='train')
                 avg_acc_all, avg_loss_all = self.avg_metric(acc_over_all), self.avg_metric(loss_over_all)
@@ -238,6 +200,9 @@ class Server(BASE):
                 self.test_writer.add_scalar('loss', avg_loss_all, global_step=i)
                 self.test_writer.add_scalar('global_gate_output', avg_gate_global_all, global_step=i)
                 self.test_writer.add_scalar('local_gate_output', avg_gate_local_all, global_step=i)
+                if i % 200 == 0:
+                    # 测试完保存当前模型
+                    self.save_clients_model(r=i)
 
     def test(self, dataset='test'):
         acc_list, loss_list = [], []
@@ -300,3 +265,7 @@ class Server(BASE):
         path = f'{path}/model.pkl'
         print(f"model saved to：{path}")
         torch.save(self.global_feature_params, path)
+
+    def save_clients_model(self, r):
+        for client in self.clients:
+            torch.save(client.model, f'./saved_models/{client.user_id}-{r}.pkl')
