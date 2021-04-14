@@ -1,6 +1,5 @@
 .git
 __pycache__
-data
 visualization
 result
 algorithm/*/*.txt
