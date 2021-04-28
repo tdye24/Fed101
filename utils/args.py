@@ -1,6 +1,6 @@
 import argparse
 
-DATASETS = ['femnist', 'cifar10', 'cifar100', 'synthetic_iid', 'mnist', 'mnist-prox', 'ml100k', 'femnist-fedml', 'flickr', 'celeba']
+DATASETS = ['mnist_malposition', 'mnist_wo_malposition', 'mnist_fedml', 'mnist_ld', 'femnist', 'cifar10', 'cifar10_dirichlet', 'cifar10_ld', 'cifar100', 'cifar100_superclass', 'synthetic_iid', 'ml100k', 'flickr', 'celeba', 'har']
 
 
 def parse_args():
@@ -60,6 +60,11 @@ def parse_args():
                         help='decay rate for learning rate',
                         type=int,
                         default=200)
+
+    parser.add_argument('--alpha',
+                        help='alpha for dirichlet distribution partition',
+                        type=float,
+                        default=0.5)
 
     parser.add_argument('--note',
                         help='note',

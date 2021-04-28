@@ -22,6 +22,7 @@ if __name__ == '__main__':
     lr = args.lr
     lr_decay = args.lr_decay
     decay_step = args.decay_step
+    alpha = args.alpha
     note = args.note
 
     print(f"#############Running FedSP With#############\n"
@@ -36,6 +37,7 @@ if __name__ == '__main__':
           f"lr:\t\t\t\t\t{lr}\n"
           f"lr-decay:\t\t\t{lr_decay}\n"
           f"decay_step:\t\t\t{decay_step}\n"
+          f"dirichlet alpha:\t{alpha}\n"
           f"note:\t\t\t\t{note}")
 
     server = Server(rounds=num_rounds,
@@ -49,6 +51,7 @@ if __name__ == '__main__':
                     batch_size=batch_size,
                     lr_decay=lr_decay,
                     decay_step=decay_step,
+                    alpha=alpha,
                     note=note)
     server.federate()
-    # server.print_optim()
+    # server.save_clients_models()

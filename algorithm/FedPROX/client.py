@@ -1,24 +1,26 @@
-import copy
 import torch
+import copy
+import numpy as np
 import torch.optim as optim
 
 from algorithm.BASE import BASE
+from algorithm.CLIENT_BASE import CLIENT_BASE
 
 
-class Client(BASE):
+class Client(CLIENT_BASE):
     def __init__(self, user_id, trainloader, testloader, model_name: str, lr=3e-4, epoch=1,
                  seed=123, lr_decay=0.99, decay_step=200):
-        BASE.__init__(self, algorithm='fedprox', seed=seed, epoch=epoch, model_name=model_name,
-                      lr=lr, lr_decay=lr_decay, decay_step=decay_step)
-
-        self.user_id = user_id
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.trainloader = trainloader
-        self.testloader = testloader
-
-        self.loss_list = []
-        self.acc_list = []
-
+        CLIENT_BASE.__init__(self,
+                             algorithm='fedprox',
+                             user_id=user_id,
+                             trainloader=trainloader,
+                             testloader=testloader,
+                             seed=seed,
+                             epoch=epoch,
+                             model_name=model_name,
+                             lr=lr,
+                             lr_decay=lr_decay,
+                             decay_step=decay_step)
         self.start_point = None
 
     @staticmethod
@@ -29,6 +31,7 @@ class Client(BASE):
             loss += torch.norm(old_params[name] - param, 2)
         return loss
 
+    # rewrite
     def train(self, round_th):
         model = self.model
         model.to(self.device)
@@ -50,11 +53,19 @@ class Client(BASE):
                 difference = self.model_difference(self.start_point, model)
                 loss = criterion(output, labels) + 0.1 / 2 * difference
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
                 optimizer.step()
                 batch_loss.append(loss.item())
         num_train_samples, update = self.trainloader.sampler.num_samples, self.get_params()
+
+        # 异常检测
+        if np.isnan(sum(batch_loss) / len(batch_loss)):
+            print(f"client {self.user_id}, loss NAN")
+            exit(0)
+
         return num_train_samples, update, sum(batch_loss) / len(batch_loss)
 
+    # rewrite
     def test(self, dataset='test'):
         model = self.model
         model.eval()
@@ -81,14 +92,3 @@ class Client(BASE):
             acc = float(total_right) / total_samples
 
         return total_samples, acc, loss.item()
-
-    def get_params(self):
-        return self.model.cpu().state_dict()
-
-    def set_params(self, model_params):
-        self.model.load_state_dict(model_params)
-
-    def update(self, client):
-        self.model.load_state_dict(client.model.state_dict())
-        self.trainloader = client.trainloader
-        self.testloader = client.testloader

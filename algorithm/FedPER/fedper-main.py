@@ -52,4 +52,3 @@ if __name__ == '__main__':
                     decay_step=decay_step,
                     note=note)
     server.federate()
-    # server.print_optim()
